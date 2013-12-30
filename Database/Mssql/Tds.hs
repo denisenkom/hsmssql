@@ -144,7 +144,7 @@ encodeUcs2 s = E.encodeLazyByteString UTF16LE s
 
 
 manglePasswordByte :: Word8 -> Word8
-manglePasswordByte ch = ((ch `shift` 4) .&. 0xff) .|. ((ch `shift` (-4)) `xor` 0xA5)
+manglePasswordByte ch = ((ch `shift` (-4)) .&. 0xff .|. (ch `shift` 4)) `xor` 0xA5
 
 manglePassword :: String -> B.ByteString
 manglePassword = (B.map manglePasswordByte) . encodeUcs2
@@ -244,6 +244,35 @@ serializeLogin (tdsver, packsize, clientver, pid, connid, optflags1, optflags2,
     putWord32le $ fromIntegral (B.length databuf) + 4
     putLazyByteString databuf
 
+tokenError = 170
+
+getUsVarChar :: LG.Get String
+getUsVarChar = do
+    len <- LG.getWord16le
+    buf <- LG.getLazyByteString ((fromIntegral len) * 2)
+    return $ E.decodeLazyByteString UTF16LE buf
+
+getBVarChar :: LG.Get String
+getBVarChar = do
+    len <- LG.getWord8
+    buf <- LG.getLazyByteString ((fromIntegral len) * 2)
+    return $ E.decodeLazyByteString UTF16LE buf
+
+parseResponse = do
+    tok <- LG.getWord8
+    case tok of
+        tokenError -> do
+            LG.getWord16le
+            number <- LG.getWord32le
+            state <- LG.getWord8
+            cls <- LG.getWord8
+            message <- getUsVarChar
+            srvname <- getBVarChar
+            procname <- getBVarChar
+            lineno <- LG.getWord32le
+            return (number, state, cls, message, srvname, procname, lineno)
+
+
 login = do
     hoststr <- getEnv "HOST"
     instances <- queryInstances hoststr
@@ -280,5 +309,6 @@ login = do
     print "reading login"
     --loginresppacket <- B.hGetNonBlocking s 4096
     (loginresptype, _, loginrespbuf) <- getPacket s
-    print loginrespbuf
-    --print $ B.head loginrespbuf
+    print $ B.head loginrespbuf
+    let loginresp = LG.runGet parseResponse loginrespbuf
+    print loginresp
