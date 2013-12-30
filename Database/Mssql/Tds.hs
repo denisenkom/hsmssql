@@ -1,4 +1,5 @@
-module Main where
+--module Main where
+module Database.Mssql.Tds where
 
 import qualified Network.Socket as Sock
 import qualified Network as Net
@@ -6,13 +7,12 @@ import Data.Bits
 import Data.Sequence
 import Data.Word
 import Network.Socket.ByteString
-import Network.MacAddress
 import qualified Data.Binary.Get as LG
 import Data.Binary.Strict.Get
 import Data.Binary.Put
 import qualified Data.Encoding as E
 import Data.Encoding.UTF16
-import Data.Text.Encoding
+--import Data.Text.Encoding
 --import qualified Data.Text as T
 import qualified Data.Map as Map
 import qualified Codec.Binary.UTF8.String as UTF8
@@ -20,10 +20,13 @@ import Data.List.Split(splitOn)
 import Data.ByteString(unpack)
 import qualified Data.ByteString.Lazy as B
 import System.Environment
+import System.IO
 import Data.Maybe
 import Control.Monad
 
 foreign import ccall unsafe "htons" htons :: Word16 -> Word16
+
+data MacAddress = MacAddress Word8 Word8 Word8 Word8 Word8 Word8
 
 parseInstances :: Get ([String])
 parseInstances = do
@@ -105,16 +108,22 @@ serializePreLogin fields = do
         putLazyByteString v)
     return ()
 
-getPacket :: LG.Get (Word8, Bool, Word16, B.ByteString)
-getPacket = do
-    packettype <- LG.getWord8
-    isfinal <- LG.getWord8
-    size <- LG.getWord16be
-    LG.getWord16be  -- spid
-    LG.getWord8  -- packet no
-    LG.getWord8  -- padding
-    buf <- LG.getLazyByteString $ fromIntegral (size - 8 - 1)
-    return (packettype, isfinal /= 0, size, buf)
+getPacket :: Handle -> IO (Word8, Bool, B.ByteString)
+getPacket s = do
+    let decode = do
+            packtype <- LG.getWord8
+            isfinal <- LG.getWord8
+            size <- LG.getWord16be
+            LG.getWord16be  -- spid
+            LG.getWord8  -- packet no
+            LG.getWord8  -- padding
+            return (packtype, isfinal /= 0, size)
+
+    hdrbuf <- B.hGet s 8
+    print hdrbuf
+    let (packtype, isfinal, size) = LG.runGet decode hdrbuf
+    content <- B.hGet s ((fromIntegral size) - 8)
+    return (packtype, isfinal, content)
 
 getPreLoginHeadImpl :: Seq (Word8, Word16, Word16) -> LG.Get (Seq (Word8, Word16, Word16))
 getPreLoginHeadImpl fields = do
@@ -177,6 +186,9 @@ serializeLogin (tdsver, packsize, clientver, pid, connid, optflags1, optflags2,
         sspioff = off databaseoff databasebuf
         atchdbfileoff = off sspioff sspibuf
         changepwdoff = off atchdbfileoff atchdbfilebuf
+        putSOffLen off buf = do
+            putWord16le off
+            putWord16le $ (len buf) `quot` 2
         putOffLen off buf = do
             putWord16le off
             putWord16le $ len buf
@@ -199,19 +211,19 @@ serializeLogin (tdsver, packsize, clientver, pid, connid, optflags1, optflags2,
             putWord8 optflags3
             putWord32le clienttz
             putWord32le clientlcid
-            putOffLen hostnameoff hostnamebuf
-            putOffLen usernameoff usernamebuf
-            putOffLen passwordoff passwordbuf
-            putOffLen appnameoff appnamebuf
-            putOffLen servernameoff servernamebuf
+            putSOffLen hostnameoff hostnamebuf
+            putSOffLen usernameoff usernamebuf
+            putSOffLen passwordoff passwordbuf
+            putSOffLen appnameoff appnamebuf
+            putSOffLen servernameoff servernamebuf
             putOffLen extensionoff extensionbuf
-            putOffLen ctlintnameoff ctlintnamebuf
-            putOffLen languageoff languagebuf
-            putOffLen databaseoff databasebuf
+            putSOffLen ctlintnameoff ctlintnamebuf
+            putSOffLen languageoff languagebuf
+            putSOffLen databaseoff databasebuf
             putMacAddr clientid
             putOffLen sspioff sspibuf
-            putOffLen atchdbfileoff atchdbfilebuf
-            putOffLen changepwdoff changepwdbuf
+            putSOffLen atchdbfileoff atchdbfilebuf
+            putSOffLen changepwdoff changepwdbuf
             putWord32le $ fromIntegral (B.length sspibuf)
             -- header done, putting variable part
             putLazyByteString hostnamebuf
@@ -229,10 +241,10 @@ serializeLogin (tdsver, packsize, clientver, pid, connid, optflags1, optflags2,
 
         databuf = runPut putData
 
-    putWord32le $ fromIntegral (B.length databuf)
+    putWord32le $ fromIntegral (B.length databuf) + 4
     putLazyByteString databuf
 
-main = do
+login = do
     hoststr <- getEnv "HOST"
     instances <- queryInstances hoststr
     --print (tokensToDictImpl tokens)
@@ -254,20 +266,19 @@ main = do
     B.hPutStr s preloginpacket
     -- reading prelogin response
     print "reading prelogin response"
-    preloginresppacket <- B.hGetContents s
-    let (packettype, _, preloginrespsize, buf) = LG.runGet getPacket preloginresppacket
-    print $ B.take (fromIntegral preloginrespsize) preloginresppacket
-    let preloginresp = LG.runGet getPreLoginHead buf
+    (packettype, _, preloginresppacket) <- getPacket s
+    let preloginresp = LG.runGet getPreLoginHead preloginresppacket
     -- sending login request
     print "sending login"
     let login = (verTDS74, 4096, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                  "", username, password, "", "", B.empty, "", "", "",
                  (MacAddress 0 0 0 0 0 0), B.empty, "", "")
     let loginbuf = runPut $ serializeLogin login
+    print loginbuf
     B.hPutStr s $ runPut (serializePacket packLogin7 loginbuf)
     -- reading login response
     print "reading login"
-    loginresppacket <- B.hGetNonBlocking s 4096
-    let (loginresptype, _, _, loginrespbuf) = LG.runGet getPacket loginresppacket
+    --loginresppacket <- B.hGetNonBlocking s 4096
+    (loginresptype, _, loginrespbuf) <- getPacket s
     print loginrespbuf
-    print $ B.head loginrespbuf
+    --print $ B.head loginrespbuf
