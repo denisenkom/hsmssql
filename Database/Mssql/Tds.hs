@@ -245,6 +245,7 @@ serializeLogin (tdsver, packsize, clientver, pid, connid, optflags1, optflags2,
     putLazyByteString databuf
 
 tokenError = 170
+tokenLoginAck = 173
 
 getUsVarChar :: LG.Get String
 getUsVarChar = do
@@ -258,19 +259,24 @@ getBVarChar = do
     buf <- LG.getLazyByteString ((fromIntegral len) * 2)
     return $ E.decodeLazyByteString UTF16LE buf
 
-parseResponse = do
-    tok <- LG.getWord8
-    case tok of
-        tokenError -> do
-            LG.getWord16le
-            number <- LG.getWord32le
-            state <- LG.getWord8
-            cls <- LG.getWord8
-            message <- getUsVarChar
-            srvname <- getBVarChar
-            procname <- getBVarChar
-            lineno <- LG.getWord32le
-            return (number, state, cls, message, srvname, procname, lineno)
+parseLoginAck = do
+    LG.getWord16le
+    iface <- LG.getWord8
+    tdsver <- LG.getWord32be
+    progname <- getBVarChar
+    progver <- LG.getWord32be
+    return (iface, tdsver, progname, progver)
+
+parseError = do
+    LG.getWord16le
+    number <- LG.getWord32le
+    state <- LG.getWord8
+    cls <- LG.getWord8
+    message <- getUsVarChar
+    srvname <- getBVarChar
+    procname <- getBVarChar
+    lineno <- LG.getWord32le
+    return (number, state, cls, message, srvname, procname, lineno)
 
 
 login = do
@@ -309,6 +315,13 @@ login = do
     print "reading login"
     --loginresppacket <- B.hGetNonBlocking s 4096
     (loginresptype, _, loginrespbuf) <- getPacket s
-    print $ B.head loginrespbuf
-    let loginresp = LG.runGet parseResponse loginrespbuf
-    print loginresp
+    let tok = B.head loginrespbuf
+    case tok of
+        170 -> do
+            let error = LG.runGet parseError $ B.tail loginrespbuf
+            print "got error"
+            print error
+        173 -> do
+            let loginack = LG.runGet parseLoginAck $ B.tail loginrespbuf
+            print "got loginack"
+            print loginack
