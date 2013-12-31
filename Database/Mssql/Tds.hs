@@ -30,6 +30,12 @@ data MacAddress = MacAddress Word8 Word8 Word8 Word8 Word8 Word8
 
 data Token = TokError {number :: Word32, state :: Word8, cls :: Word8, message :: String, srvname :: String, procname :: String, lineno :: Word32}
            | TokLoginAck {iface :: Word8, tdsver :: Word32, progname :: String, progver :: Word32}
+           | TokEnvChange [EnvChange]
+           | TokDone Word16 Word16 Word32
+           | TokZero
+     deriving(Show)
+
+data EnvChange = PacketSize Int Int
      deriving(Show)
 
 parseInstancesImpl :: Get ([String])
@@ -289,13 +295,51 @@ parseError = do
     return $ TokError number state cls message srvname procname lineno
 
 
-parseToken buf = do
-    let tok = B.head buf
+parseEnvChange = do
+    let parseEnvChangeRec = do
+            envtype <- LG.getWord8
+            case envtype of
+                4 -> do
+                    curval <- getBVarChar
+                    prevval <- getBVarChar
+                    return $ PacketSize (read curval) (read prevval)
+
+    size <- LG.getWord16le
+    envchgrec <- parseEnvChangeRec
+    return $ TokEnvChange [envchgrec]
+
+parseDone = do
+    status <- LG.getWord16le
+    curcmd <- LG.getWord16le
+    rowcount <- LG.getWord32le
+    return $ TokDone status curcmd rowcount
+
+parseToken :: LG.Get Token
+parseToken = do
+    tok <- LG.getWord8
     case tok of
+        0 -> do
+            return TokZero
         170 -> do
-            return $ LG.runGet parseError $ B.tail buf
+            parseError
         173 -> do
-            return $ LG.runGet parseLoginAck $ B.tail buf
+            parseLoginAck
+        227 -> do
+            parseEnvChange
+        253 -> do
+            parseDone
+        _ -> do
+            fail $ "unknown token type " ++ (show tok)
+
+parseTokens :: LG.Get [Token]
+parseTokens = do
+    empty <- LG.isEmpty
+    if empty
+        then return []
+        else do
+            token <- parseToken
+            tokens <- parseTokens
+            return (token:tokens)
 
 
 login = do
@@ -334,5 +378,6 @@ login = do
     print "reading login"
     --loginresppacket <- B.hGetNonBlocking s 4096
     (loginresptype, _, loginrespbuf) <- getPacket s
-    token <- parseToken loginrespbuf
-    print token
+    let tokens = LG.runGet parseTokens loginrespbuf
+    print tokens
+    fail "not yet implemented"
