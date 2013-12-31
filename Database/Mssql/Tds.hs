@@ -40,18 +40,20 @@ parseInstancesImpl = do
             return tokens
         else return []
 
-parseInstances :: BS.ByteString -> [Map.Map String String]
-parseInstances s = fn $ runGet parseInstancesImpl s
+parseInstances :: BS.ByteString -> Either String [Map.Map String String]
+parseInstances s = 
+    let res = runGet parseInstancesImpl s
+    in case res of
+        (Right tokens, _) -> Right $ tokensToDict tokens
+        (Left err, _) -> Left err
 
-tokensToDict [] = Map.empty
+tokensToDict tokens = tokensToDictImpl [] Map.empty tokens
 
 tokensToDictImpl :: [Map.Map String String] -> Map.Map String String -> [String] -> [Map.Map String String]
 tokensToDictImpl l m [] = l
 tokensToDictImpl l m ("":"":[]) = (m:l)
 tokensToDictImpl l m ("":xs) = tokensToDictImpl (m:l) Map.empty xs
 tokensToDictImpl l m (k:v:xs) = tokensToDictImpl l (Map.insert k v m) xs
-
-fn (Right a, b) = tokensToDictImpl [] Map.empty a
 
 isInst name m = case Map.lookup "InstanceName" m of Just n -> n == name
                                                     Nothing -> False
@@ -64,7 +66,12 @@ queryInstances hoststr = do
     let addr = Sock.SockAddrInet (Sock.PortNum (htons 1434)) host
     sent <- Sock.sendTo s "\x3" addr
     res <- Network.Socket.ByteString.recv s (16 * 1024 - 1)
-    return $ parseInstances res
+    let parse_res = parseInstances res
+    case parse_res of
+        Right instances -> return instances
+        Left err -> do
+            print err
+            return []
 
 packLogin7 = 16
 packPrelogin = 18

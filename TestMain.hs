@@ -29,7 +29,7 @@ test_parseInstances =
                         ("tcp","49849")]]
         decoded = parseInstances bs
     in
-        assertEqual ref decoded
+        assertEqual (Right ref) decoded
 
 test_sendLogin =
     let login = (verTDS74,
