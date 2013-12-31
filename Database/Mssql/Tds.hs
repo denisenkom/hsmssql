@@ -19,7 +19,6 @@ import qualified Codec.Binary.UTF8.String as UTF8
 import Data.List.Split(splitOn)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as B
-import System.Environment
 import System.IO
 import Data.Maybe
 import Control.Monad
@@ -342,16 +341,21 @@ parseTokens = do
             return (token:tokens)
 
 
-login = do
-    hoststr <- getEnv "HOST"
-    instances <- queryInstances hoststr
-    --print (tokensToDictImpl tokens)
-    inst <- getEnv "INSTANCE"
-    password <- getEnv "SQLPASSWORD"
-    username <- getEnv "SQLUSER"
-    let ports = catMaybes [Map.lookup "tcp" i| i <- instances, isInst inst i]
-    let port = htons (read (head ports) :: Word16)
-    s <- Net.connectTo hoststr (Net.PortNumber $ Sock.PortNum port)
+getPort host inst = do
+    if inst /= ""
+        then do
+            instances <- queryInstances host
+            let ports = catMaybes [Map.lookup "tcp" i| i <- instances, isInst inst i]
+            let port = htons (read (head ports) :: Word16)
+            return port
+        else return 1433
+
+
+login :: String -> String -> String -> String -> IO ()
+login host inst username password = do
+    port <- getPort host inst
+
+    s <- Net.connectTo host (Net.PortNumber $ Sock.PortNum port)
     -- sending prelogin request
     let instbytes = B.pack ((UTF8.encode inst) ++ [0])
     let prelogin = Map.fromList [(preloginVersion, B.pack [0, 0, 0, 0, 0, 0]),

@@ -9,6 +9,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Map as M
 import Data.Char (ord)
+import System.Environment
 
 test_parseInstances =
     let s = "\ENQ\179\NULServerName;sqlhost;InstanceName;SQLEXPRESS;" ++
@@ -75,7 +76,11 @@ test_sendLogin =
         assertEqual ref $ B.unpack packet
 
 test_login = do
-    login
+    hoststr <- getEnv "HOST"
+    inst <- getEnv "INSTANCE"
+    password <- getEnv "SQLPASSWORD"
+    username <- getEnv "SQLUSER"
+    login hoststr inst username password
 
 main = htfMain htf_thisModulesTests
 
