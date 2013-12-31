@@ -17,7 +17,7 @@ import Data.Encoding.UTF16
 import qualified Data.Map as Map
 import qualified Codec.Binary.UTF8.String as UTF8
 import Data.List.Split(splitOn)
-import Data.ByteString(unpack)
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as B
 import System.Environment
 import System.IO
@@ -28,8 +28,8 @@ foreign import ccall unsafe "htons" htons :: Word16 -> Word16
 
 data MacAddress = MacAddress Word8 Word8 Word8 Word8 Word8 Word8
 
-parseInstances :: Get ([String])
-parseInstances = do
+parseInstancesImpl :: Get ([String])
+parseInstancesImpl = do
     pref <- getWord8
     _ <- getWord16be
     if pref == 5
@@ -37,13 +37,14 @@ parseInstances = do
             --x <- Data.Text.Encoding.decodeASCII (getBytes remaining)
             rem <- remaining
             str <- getByteString rem
-            let tokens = (splitOn ";" (UTF8.decode (unpack str)))
+            let tokens = (splitOn ";" (UTF8.decode (BS.unpack str)))
             return tokens
         else return []
 
-tokensToDict [] = Map.empty
+parseInstances :: BS.ByteString -> [Map.Map String String]
+parseInstances s = fn $ runGet parseInstancesImpl s
 
---tokensToDictImpl :: Map.Map T.Text T.Text -> [T.Text] -> Map.Map T.Text T.Text
+tokensToDict [] = Map.empty
 
 tokensToDictImpl :: [Map.Map String String] -> Map.Map String String -> [String] -> [Map.Map String String]
 tokensToDictImpl l m [] = l
@@ -64,8 +65,8 @@ queryInstances hoststr = do
     let addr = Sock.SockAddrInet (Sock.PortNum (htons 1434)) host
     sent <- Sock.sendTo s "\x3" addr
     res <- Network.Socket.ByteString.recv s (16 * 1024 - 1)
-    let tokens = runGet parseInstances res
-    return $ fn tokens
+    print res
+    return $ parseInstances res
 
 packLogin7 = 16
 packPrelogin = 18

@@ -3,9 +3,33 @@ module Main where
 
 import Test.Framework
 import Database.Mssql.Tds
-import qualified Data.ByteString.Lazy as B
 import Data.Binary.Put
+import Data.Binary.Strict.Get
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as B
+import qualified Data.Map as M
+import Data.Char (ord)
 
+test_parseInstances =
+    let s = "\ENQ\179\NULServerName;sqlhost;InstanceName;SQLEXPRESS;" ++
+            "IsClustered;No;Version;10.0.1600.22;tcp;49849;;" ++
+            "ServerName;sqlhost;InstanceName;SQL2012;IsClustered;" ++
+            "No;Version;11.0.2100.60;tcp;59958;;"
+        bs = BS.pack $ map (fromIntegral . ord) s
+        ref = [
+            M.fromList [("InstanceName","SQL2012"),
+                        ("IsClustered","No"),
+                        ("ServerName","sqlhost"),
+                        ("Version","11.0.2100.60"),
+                        ("tcp","59958")],
+            M.fromList [("InstanceName","SQLEXPRESS"),
+                        ("IsClustered","No"),
+                        ("ServerName","sqlhost"),
+                        ("Version","10.0.1600.22"),
+                        ("tcp","49849")]]
+        decoded = parseInstances bs
+    in
+        assertEqual ref decoded
 
 test_sendLogin =
     let login = (verTDS74,
