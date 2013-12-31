@@ -31,7 +31,7 @@ data MacAddress = MacAddress Word8 Word8 Word8 Word8 Word8 Word8
 data Token = TokError {number :: Word32, state :: Word8, cls :: Word8, message :: String, srvname :: String, procname :: String, lineno :: Word32}
            | TokLoginAck {iface :: Word8, tdsver :: Word32, progname :: String, progver :: Word32}
            | TokEnvChange [EnvChange]
-           | TokDone Word16 Word16 Word32
+           | TokDone Word16 Word16 Word64
            | TokZero
      deriving(Show)
 
@@ -311,7 +311,7 @@ parseEnvChange = do
 parseDone = do
     status <- LG.getWord16le
     curcmd <- LG.getWord16le
-    rowcount <- LG.getWord32le
+    rowcount <- LG.getWord64le
     return $ TokDone status curcmd rowcount
 
 parseToken :: LG.Get Token
