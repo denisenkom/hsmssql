@@ -34,10 +34,9 @@ parseInstancesImpl = do
     _ <- getWord16be
     if pref == 5
         then do
-            --x <- Data.Text.Encoding.decodeASCII (getBytes remaining)
             rem <- remaining
             str <- getByteString rem
-            let tokens = (splitOn ";" (UTF8.decode (BS.unpack str)))
+            let tokens = splitOn ";" $ (UTF8.decode . BS.unpack) str
             return tokens
         else return []
 
@@ -65,7 +64,6 @@ queryInstances hoststr = do
     let addr = Sock.SockAddrInet (Sock.PortNum (htons 1434)) host
     sent <- Sock.sendTo s "\x3" addr
     res <- Network.Socket.ByteString.recv s (16 * 1024 - 1)
-    print res
     return $ parseInstances res
 
 packLogin7 = 16
