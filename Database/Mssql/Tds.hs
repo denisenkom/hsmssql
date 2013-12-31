@@ -11,6 +11,7 @@ import qualified Data.Binary.Get as LG
 import Data.Binary.Strict.Get
 import Data.Binary.Put
 import qualified Data.Encoding as E
+import Data.Encoding.ASCII
 import Data.Encoding.UTF16
 --import Data.Text.Encoding
 --import qualified Data.Text as T
@@ -357,15 +358,14 @@ login host inst username password = do
 
     s <- Net.connectTo host (Net.PortNumber $ Sock.PortNum port)
     -- sending prelogin request
-    let instbytes = B.pack ((UTF8.encode inst) ++ [0])
-    let prelogin = Map.fromList [(preloginVersion, B.pack [0, 0, 0, 0, 0, 0]),
+    let instbytes = B.snoc (E.encodeLazyByteString ASCII inst) 0
+        prelogin = Map.fromList [(preloginVersion, B.pack [0, 0, 0, 0, 0, 0]),
                                  (preloginEncryption, B.pack [2]),
                                  (preloginInstOpt, instbytes),
                                  (preloginThreadId, B.pack [0, 0, 0, 0]),
                                  (preloginMars, B.pack [0])]
-    let preloginbuf = runPut (serializePreLogin prelogin)
-    let preloginpacket = runPut (serializePacket packPrelogin preloginbuf)
-    B.hPutStr s preloginpacket
+        preloginbuf = runPut $ serializePreLogin prelogin
+    B.hPutStr s $ runPut $ serializePacket packPrelogin preloginbuf
     -- reading prelogin response
     print "reading prelogin response"
     (packettype, _, preloginresppacket) <- getPacket s
