@@ -28,6 +28,10 @@ foreign import ccall unsafe "htons" htons :: Word16 -> Word16
 
 data MacAddress = MacAddress Word8 Word8 Word8 Word8 Word8 Word8
 
+data Token = TokError {number :: Word32, state :: Word8, cls :: Word8, message :: String, srvname :: String, procname :: String, lineno :: Word32}
+           | TokLoginAck {iface :: Word8, tdsver :: Word32, progname :: String, progver :: Word32}
+     deriving(Show)
+
 parseInstancesImpl :: Get ([String])
 parseInstancesImpl = do
     pref <- getWord8
@@ -271,7 +275,7 @@ parseLoginAck = do
     tdsver <- LG.getWord32be
     progname <- getBVarChar
     progver <- LG.getWord32be
-    return (iface, tdsver, progname, progver)
+    return $ TokLoginAck iface tdsver progname progver
 
 parseError = do
     LG.getWord16le
@@ -282,7 +286,16 @@ parseError = do
     srvname <- getBVarChar
     procname <- getBVarChar
     lineno <- LG.getWord32le
-    return (number, state, cls, message, srvname, procname, lineno)
+    return $ TokError number state cls message srvname procname lineno
+
+
+parseToken buf = do
+    let tok = B.head buf
+    case tok of
+        170 -> do
+            return $ LG.runGet parseError $ B.tail buf
+        173 -> do
+            return $ LG.runGet parseLoginAck $ B.tail buf
 
 
 login = do
@@ -321,13 +334,5 @@ login = do
     print "reading login"
     --loginresppacket <- B.hGetNonBlocking s 4096
     (loginresptype, _, loginrespbuf) <- getPacket s
-    let tok = B.head loginrespbuf
-    case tok of
-        170 -> do
-            let error = LG.runGet parseError $ B.tail loginrespbuf
-            print "got error"
-            print error
-        173 -> do
-            let loginack = LG.runGet parseLoginAck $ B.tail loginrespbuf
-            print "got loginack"
-            print loginack
+    token <- parseToken loginrespbuf
+    print token
