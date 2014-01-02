@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -F -pgmF htfpp #-}
 module Main where
 
-import Test.Framework
+import Control.Exception
 import Database.Mssql.Tds
 import Data.Binary.Put
 import Data.Binary.Strict.Get
@@ -10,6 +10,7 @@ import qualified Data.ByteString.Lazy as B
 import qualified Data.Map as M
 import Data.Char (ord)
 import System.Environment
+import Test.Framework
 
 test_parseInstances =
     let s = "\ENQ\179\NULServerName;sqlhost;InstanceName;SQLEXPRESS;" ++
@@ -87,7 +88,13 @@ test_badPwd = do
     inst <- getEnv "INSTANCE"
     password <- getEnv "SQLPASSWORD"
     username <- getEnv "SQLUSER"
-    login hoststr inst username (password ++ "bad")
+    let handler :: SomeException -> IO ()
+        handler e = return ()
+        doLogin = login hoststr inst username (password ++ "bad")
+        try = do
+            doLogin
+            fail "Should fail with bad password"
+    try `catch` handler
 
 main = htfMain htf_thisModulesTests
 
