@@ -4,7 +4,8 @@ module Database.Mssql.Tds where
 import qualified Network.Socket as Sock
 import qualified Network as Net
 import Data.Bits
-import Data.Sequence
+import Data.Sequence((|>))
+import qualified Data.Sequence as Seq
 import Data.Word
 import Network.Socket.ByteString
 import qualified Data.Binary.Get as LG
@@ -20,6 +21,7 @@ import qualified Codec.Binary.UTF8.String as UTF8
 import Data.List.Split(splitOn)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as B
+import Data.String.Utils as SU
 import System.IO
 import Data.Maybe
 import Control.Monad
@@ -28,15 +30,30 @@ foreign import ccall unsafe "htons" htons :: Word16 -> Word16
 
 data MacAddress = MacAddress Word8 Word8 Word8 Word8 Word8 Word8
 
-data Token = TokError {number :: Word32, state :: Word8, cls :: Word8, message :: String, srvname :: String, procname :: String, lineno :: Word32}
-           | TokLoginAck {iface :: Word8, tdsver :: Word32, progname :: String, progver :: Word32}
+data Token = TokError {number :: Word32,
+                       state :: Word8,
+                       cls :: Word8,
+                       message :: String,
+                       srvname :: String,
+                       procname :: String,
+                       lineno :: Word32}
+           | TokLoginAck {iface :: Word8,
+                          tdsver :: Word32,
+                          progname :: String,
+                          progver :: Word32}
            | TokEnvChange [EnvChange]
            | TokDone Word16 Word16 Word64
            | TokZero
-     deriving(Show)
+     deriving(Eq, Show)
+
+isTokLoginAck (TokLoginAck _ _ _ _) = True
+isTokLoginAck _ = False
+
+isTokError (TokError _ _ _ _ _ _ _) = True
+isTokError _ = False
 
 data EnvChange = PacketSize Int Int
-     deriving(Show)
+     deriving(Eq, Show)
 
 parseInstancesImpl :: Get ([String])
 parseInstancesImpl = do
@@ -141,7 +158,7 @@ getPacket s = do
     content <- B.hGet s ((fromIntegral size) - 8)
     return (packtype, isfinal, content)
 
-getPreLoginHeadImpl :: Seq (Word8, Word16, Word16) -> LG.Get (Seq (Word8, Word16, Word16))
+getPreLoginHeadImpl :: Seq.Seq (Word8, Word16, Word16) -> LG.Get (Seq.Seq (Word8, Word16, Word16))
 getPreLoginHeadImpl fields = do
     rectype <- LG.getWord8
     if rectype == preloginTerminator
@@ -151,9 +168,9 @@ getPreLoginHeadImpl fields = do
             size <- LG.getWord16be
             getPreLoginHeadImpl $ fields |> (rectype, offset, size)
 
-getPreLoginHead :: LG.Get (Seq (Word8, Word16, Word16))
+getPreLoginHead :: LG.Get (Seq.Seq (Word8, Word16, Word16))
 getPreLoginHead = do
-    getPreLoginHeadImpl empty
+    getPreLoginHeadImpl Seq.empty
 
 encodeUcs2 :: String -> B.ByteString
 encodeUcs2 s = E.encodeLazyByteString UTF16LE s
@@ -352,6 +369,8 @@ getPort host inst = do
         else return 1433
 
 
+
+
 login :: String -> String -> String -> String -> IO ()
 login host inst username password = do
     port <- getPort host inst
@@ -383,5 +402,8 @@ login host inst username password = do
     --loginresppacket <- B.hGetNonBlocking s 4096
     (loginresptype, _, loginrespbuf) <- getPacket s
     let tokens = LG.runGet parseTokens loginrespbuf
-    print tokens
-    fail "not yet implemented"
+        errors = filter isTokError tokens
+    if (filter isTokLoginAck tokens) == []
+            then fail (let srverr = SU.join " " [message e | e <- errors]
+                       in if srverr == "" then "Login failed." else srverr)
+            else return ()

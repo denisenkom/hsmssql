@@ -82,5 +82,12 @@ test_login = do
     username <- getEnv "SQLUSER"
     login hoststr inst username password
 
+test_badPwd = do
+    hoststr <- getEnv "HOST"
+    inst <- getEnv "INSTANCE"
+    password <- getEnv "SQLPASSWORD"
+    username <- getEnv "SQLUSER"
+    login hoststr inst username (password ++ "bad")
+
 main = htfMain htf_thisModulesTests
 

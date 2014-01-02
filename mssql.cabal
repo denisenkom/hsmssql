@@ -19,6 +19,7 @@ library
         encoding == 0.6.*,
         binary == 0.5.*,
         binary-strict == 0.4.*,
+        MissingH == 1.2.*,
         network == 2.4.*
     exposed-modules:
         Database.Mssql.Tds
@@ -38,5 +39,6 @@ test-suite mssql-tests
         encoding == 0.6.*,
         binary == 0.5.*,
         binary-strict == 0.4.*,
+        MissingH == 1.2.*,
         network == 2.4.*
     default-language:   Haskell2010
