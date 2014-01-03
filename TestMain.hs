@@ -3,6 +3,7 @@ module Main where
 
 import Control.Exception
 import Database.Mssql.Tds
+import Database.HDBC
 import Data.Binary.Put
 import Data.Binary.Strict.Get
 import qualified Data.ByteString as BS
@@ -81,7 +82,8 @@ test_connect = do
     inst <- getEnv "INSTANCE"
     password <- getEnv "SQLPASSWORD"
     username <- getEnv "SQLUSER"
-    connectMssql hoststr inst username password
+    conn <- connectMssql hoststr inst username password
+    disconnect conn
 
 test_badPwd = do
     hoststr <- getEnv "HOST"

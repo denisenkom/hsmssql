@@ -1,6 +1,8 @@
 --module Main where
 module Database.Mssql.Tds where
 
+import Database.Mssql.Connection
+
 import qualified Network.Socket as Sock
 import qualified Network as Net
 import Data.Bits
@@ -371,7 +373,7 @@ getPort host inst = do
 
 
 
-connectMssql :: String -> String -> String -> String -> IO ()
+connectMssql :: String -> String -> String -> String -> IO Connection
 connectMssql host inst username password = do
     port <- getPort host inst
 
@@ -406,4 +408,8 @@ connectMssql host inst username password = do
     if (filter isTokLoginAck tokens) == []
             then fail (let srverr = SU.join " " [message e | e <- errors]
                        in if srverr == "" then "Login failed." else srverr)
-            else return ()
+            else return Connection {disconnect = fdisconnect s}
+
+
+fdisconnect :: Handle -> IO ()
+fdisconnect = hClose
