@@ -76,12 +76,12 @@ test_sendLogin =
     in
         assertEqual ref $ B.unpack packet
 
-test_login = do
+test_connect = do
     hoststr <- getEnv "HOST"
     inst <- getEnv "INSTANCE"
     password <- getEnv "SQLPASSWORD"
     username <- getEnv "SQLUSER"
-    login hoststr inst username password
+    connectMssql hoststr inst username password
 
 test_badPwd = do
     hoststr <- getEnv "HOST"
@@ -90,9 +90,9 @@ test_badPwd = do
     username <- getEnv "SQLUSER"
     let handler :: SomeException -> IO ()
         handler e = return ()
-        doLogin = login hoststr inst username (password ++ "bad")
+        doConnect = connectMssql hoststr inst username (password ++ "bad")
         try = do
-            doLogin
+            doConnect
             fail "Should fail with bad password"
     try `catch` handler
 

@@ -371,8 +371,8 @@ getPort host inst = do
 
 
 
-login :: String -> String -> String -> String -> IO ()
-login host inst username password = do
+connectMssql :: String -> String -> String -> String -> IO ()
+connectMssql host inst username password = do
     port <- getPort host inst
 
     s <- Net.connectTo host (Net.PortNumber $ Sock.PortNum port)
