@@ -46,6 +46,9 @@ data Token = TokError {number :: Word32,
            | TokEnvChange [EnvChange]
            | TokDone Word16 Word16 Word64
            | TokZero
+           | TokColMetaDataEmpty
+           | TokColMetaData [ColMetaData]
+           | TokRow [Int]
      deriving(Eq, Show)
 
 isTokLoginAck (TokLoginAck _ _ _ _) = True
@@ -55,6 +58,12 @@ isTokError (TokError _ _ _ _ _ _ _) = True
 isTokError _ = False
 
 data EnvChange = PacketSize Int Int
+     deriving(Eq, Show)
+
+data TypeInfo = TypeInfo Word8
+     deriving(Eq, Show)
+
+data ColMetaData = ColMetaData Word32 Word16 TypeInfo String
      deriving(Eq, Show)
 
 parseInstancesImpl :: Get ([String])
@@ -102,6 +111,7 @@ queryInstances hoststr = do
             print err
             return []
 
+packSQLBatch = 1
 packLogin7 = 16
 packPrelogin = 18
 
@@ -155,7 +165,6 @@ getPacket s = do
             return (packtype, isfinal /= 0, size)
 
     hdrbuf <- B.hGet s 8
-    print hdrbuf
     let (packtype, isfinal, size) = LG.runGet decode hdrbuf
     content <- B.hGet s ((fromIntegral size) - 8)
     return (packtype, isfinal, content)
@@ -294,6 +303,33 @@ getBVarChar = do
     buf <- LG.getLazyByteString ((fromIntegral len) * 2)
     return $ E.decodeLazyByteString UTF16LE buf
 
+parseTypeInfo :: LG.Get TypeInfo
+parseTypeInfo = do
+    typeid <- LG.getWord8
+    return $ TypeInfo typeid
+
+parseColMetaData72 :: LG.Get Token
+parseColMetaData72 = do
+    let parseCol = do
+            usertype <- LG.getWord32le
+            flags <- LG.getWord16le
+            ti <- parseTypeInfo
+            name <- getBVarChar
+            return $ ColMetaData usertype flags ti name
+        parseMeta 0xffff = return TokColMetaDataEmpty
+        parseMeta cnt = do
+            cols <- parseCols cnt
+            return $ TokColMetaData cols
+        parseCols 0 = return []
+        parseCols cnt = do
+            col <- parseCol
+            cols <- parseCols $ cnt - 1
+            return (col:cols)
+
+    cnt <- LG.getWord16le
+    parseMeta cnt
+
+
 parseLoginAck = do
     LG.getWord16le
     iface <- LG.getWord8
@@ -301,6 +337,10 @@ parseLoginAck = do
     progname <- getBVarChar
     progver <- LG.getWord32be
     return $ TokLoginAck iface tdsver progname progver
+
+parseRow cols = do
+    val <- LG.getWord32le
+    return $ TokRow [fromIntegral val]
 
 parseError = do
     LG.getWord16le
@@ -339,10 +379,14 @@ parseToken = do
     case tok of
         0 -> do
             return TokZero
+        129 -> do
+            parseColMetaData72
         170 -> do
             parseError
         173 -> do
             parseLoginAck
+        209 -> do
+            parseRow []
         227 -> do
             parseEnvChange
         253 -> do
@@ -388,19 +432,15 @@ connectMssql host inst username password = do
         preloginbuf = runPut $ serializePreLogin prelogin
     B.hPutStr s $ runPut $ serializePacket packPrelogin preloginbuf
     -- reading prelogin response
-    print "reading prelogin response"
     (packettype, _, preloginresppacket) <- getPacket s
     let preloginresp = LG.runGet getPreLoginHead preloginresppacket
     -- sending login request
-    print "sending login"
     let login = (verTDS74, 4096, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                  "", username, password, "", "", B.empty, "", "", "",
                  (MacAddress 0 0 0 0 0 0), B.empty, "", "")
     let loginbuf = runPut $ serializeLogin login
-    print loginbuf
     B.hPutStr s $ runPut (serializePacket packLogin7 loginbuf)
     -- reading login response
-    print "reading login"
     --loginresppacket <- B.hGetNonBlocking s 4096
     (loginresptype, _, loginrespbuf) <- getPacket s
     let tokens = LG.runGet parseTokens loginrespbuf
@@ -408,8 +448,57 @@ connectMssql host inst username password = do
     if (filter isTokLoginAck tokens) == []
             then fail (let srverr = SU.join " " [message e | e <- errors]
                        in if srverr == "" then "Login failed." else srverr)
-            else return Connection {disconnect = fdisconnect s}
+            else return Connection {disconnect = fdisconnect s,
+                                    runRaw = frunRaw s}
+
+dataStmHdrQueryNotif = 1  -- query notifications
+dataStmHdrTransDescr = 2  -- MARS transaction descriptor (required)
+dataStmHdrTraceActivity = 3
+
+data DataStmHeader = DataStmHeader Word16 B.ByteString
+            | DataStmTransDescrHdr Word64 Word32
+
+
+putDataStmHeaders headers = do
+    let putHeader (DataStmHeader htype dat) = do
+            putWord16le htype
+            putLazyByteString dat
+        putHeader (DataStmTransDescrHdr transDescr reqCnt) = do
+            putWord16le dataStmHdrTransDescr
+            putWord64le transDescr
+            putWord32le reqCnt
+        putHeaders [] = return ()
+        putHeaders (header:xs) = do
+            let hdrbuf = runPut $ putHeader header
+                hdrsize = fromIntegral (B.length hdrbuf) + 4
+            putWord32le hdrsize
+            putLazyByteString hdrbuf
+            putHeaders xs
+        headersbuf = runPut $ putHeaders headers
+        headerssize = fromIntegral (B.length headersbuf) + 4
+
+    putWord32le headerssize
+    putLazyByteString headersbuf
+
+
+sendSqlBatch72 :: Handle -> [DataStmHeader] -> String -> IO ()
+sendSqlBatch72 s headers query = do
+    let putContent = do
+            putDataStmHeaders headers
+            putLazyByteString $ encodeUcs2 query
+        packetbuf = runPut putContent
+    B.hPutStr s $ runPut $ serializePacket packSQLBatch packetbuf
 
 
 fdisconnect :: Handle -> IO ()
 fdisconnect = hClose
+
+frunRaw :: Handle -> String -> IO ()
+frunRaw s query = do
+    let headers = [DataStmTransDescrHdr 0 1]
+    sendSqlBatch72 s headers query
+    (resptype, _, respbuf) <- getPacket s
+    let tokens = LG.runGet parseTokens respbuf
+        errors = filter isTokError tokens
+    print tokens
+    fail "errors"

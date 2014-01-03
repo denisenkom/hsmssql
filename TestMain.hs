@@ -77,12 +77,15 @@ test_sendLogin =
     in
         assertEqual ref $ B.unpack packet
 
-test_connect = do
+connect = do
     hoststr <- getEnv "HOST"
     inst <- getEnv "INSTANCE"
     password <- getEnv "SQLPASSWORD"
     username <- getEnv "SQLUSER"
-    conn <- connectMssql hoststr inst username password
+    connectMssql hoststr inst username password
+
+test_connect = do
+    conn <- connect
     disconnect conn
 
 test_badPwd = do
@@ -98,5 +101,9 @@ test_badPwd = do
             fail "Should fail with bad password"
     try `catch` handler
 
-main = htfMain htf_thisModulesTests
+test_runRaw = do
+    conn <- connect
+    runRaw conn "select 1"
+    disconnect conn
 
+main = htfMain htf_thisModulesTests
