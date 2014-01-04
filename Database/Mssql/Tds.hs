@@ -1,10 +1,9 @@
 --module Main where
 module Database.Mssql.Tds where
 
-import Database.Mssql.Connection
-
+import Database.HDBC
+import Database.HDBC.Types
 import qualified Network.Socket as Sock
-import qualified Network as Net
 import Data.Bits
 import Data.Sequence((|>))
 import qualified Data.Sequence as Seq
@@ -14,7 +13,6 @@ import qualified Data.Binary.Get as LG
 import Data.Binary.Strict.Get
 import Data.Binary.Put
 import qualified Data.Encoding as E
-import Data.Encoding.ASCII
 import Data.Encoding.UTF16
 --import Data.Text.Encoding
 --import qualified Data.Text as T
@@ -23,7 +21,6 @@ import qualified Codec.Binary.UTF8.String as UTF8
 import Data.List.Split(splitOn)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as B
-import Data.String.Utils as SU
 import System.IO
 import Data.Maybe
 import Control.Monad
@@ -133,13 +130,13 @@ preparePreLoginImpl offset ((k, v):xs) =
     let offset' = (offset + fromIntegral (B.length v))
     in (k, v, offset):(preparePreLoginImpl offset' xs)
 
-preloginVersion = 0
-preloginEncryption = 1
-preloginInstOpt = 2
-preloginThreadId = 3
-preloginMars = 4
-preloginTraceId = 5
-preloginTerminator = 0xff
+preloginVersion = 0 :: Word8
+preloginEncryption = 1 :: Word8
+preloginInstOpt = 2 :: Word8
+preloginThreadId = 3 :: Word8
+preloginMars = 4 :: Word8
+preloginTraceId = 5 :: Word8
+preloginTerminator = 0xff :: Word8
 
 serializePreLogin :: Map.Map Word8  B.ByteString -> Put
 serializePreLogin fields = do
@@ -152,6 +149,19 @@ serializePreLogin fields = do
     forM (Map.elems fields) (\v -> do
         putLazyByteString v)
     return ()
+
+
+sendPreLogin :: Handle -> Map.Map Word8 B.ByteString -> IO ()
+sendPreLogin s prelogin =
+    do let preloginbuf = runPut $ serializePreLogin prelogin
+       B.hPutStr s $ runPut $ serializePacket packPrelogin preloginbuf
+
+
+recvPreLogin :: Handle -> IO (Seq.Seq (Word8, Word16, Word16))
+recvPreLogin s =
+    do (packettype, _, preloginresppacket) <- getPacket s
+       return $ LG.runGet getPreLoginHead preloginresppacket
+
 
 getPacket :: Handle -> IO (Word8, Bool, B.ByteString)
 getPacket s = do
@@ -193,7 +203,7 @@ manglePasswordByte ch = ((ch `shift` (-4)) .&. 0xff .|. (ch `shift` 4)) `xor` 0x
 manglePassword :: String -> B.ByteString
 manglePassword = (B.map manglePasswordByte) . encodeUcs2
 
-verTDS74 = 0x74000004
+verTDS74 = 0x74000004 :: Word32
 
 serializeLogin :: (Word32, Word32, Word32, Word32, Word32,
                   Word8, Word8, Word8, Word8, Word32,
@@ -287,6 +297,25 @@ serializeLogin (tdsver, packsize, clientver, pid, connid, optflags1, optflags2,
 
     putWord32le $ fromIntegral (B.length databuf) + 4
     putLazyByteString databuf
+
+
+sendLogin :: Handle -> (Word32, Word32, Word32, Word32, Word32,
+                  Word8, Word8, Word8, Word8, Word32,
+                  Word32, String, String, String, String,
+                  String, B.ByteString, String, String, String,
+                  MacAddress, B.ByteString, String,
+                  String) -> IO ()
+sendLogin s login =
+    do let loginbuf = runPut $ serializeLogin login
+       B.hPutStr s $ runPut (serializePacket packLogin7 loginbuf)
+
+
+recvTokens s =
+    do (loginresptype, _, loginrespbuf) <- getPacket s
+       let tokens = LG.runGet parseTokens loginrespbuf
+           errors = filter isTokError tokens
+       return tokens
+
 
 tokenError = 170
 tokenLoginAck = 173
@@ -433,42 +462,6 @@ getPort host inst = do
         else return 1433
 
 
-
-
-connectMssql :: String -> String -> String -> String -> IO Connection
-connectMssql host inst username password = do
-    port <- getPort host inst
-
-    s <- Net.connectTo host (Net.PortNumber $ Sock.PortNum port)
-    -- sending prelogin request
-    let instbytes = B.snoc (E.encodeLazyByteString ASCII inst) 0
-        prelogin = Map.fromList [(preloginVersion, B.pack [0, 0, 0, 0, 0, 0]),
-                                 (preloginEncryption, B.pack [2]),
-                                 (preloginInstOpt, instbytes),
-                                 (preloginThreadId, B.pack [0, 0, 0, 0]),
-                                 (preloginMars, B.pack [0])]
-        preloginbuf = runPut $ serializePreLogin prelogin
-    B.hPutStr s $ runPut $ serializePacket packPrelogin preloginbuf
-    -- reading prelogin response
-    (packettype, _, preloginresppacket) <- getPacket s
-    let preloginresp = LG.runGet getPreLoginHead preloginresppacket
-    -- sending login request
-    let login = (verTDS74, 4096, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                 "", username, password, "", "", B.empty, "", "", "",
-                 (MacAddress 0 0 0 0 0 0), B.empty, "", "")
-    let loginbuf = runPut $ serializeLogin login
-    B.hPutStr s $ runPut (serializePacket packLogin7 loginbuf)
-    -- reading login response
-    --loginresppacket <- B.hGetNonBlocking s 4096
-    (loginresptype, _, loginrespbuf) <- getPacket s
-    let tokens = LG.runGet parseTokens loginrespbuf
-        errors = filter isTokError tokens
-    if (filter isTokLoginAck tokens) == []
-            then fail (let srverr = SU.join " " [message e | e <- errors]
-                       in if srverr == "" then "Login failed." else srverr)
-            else return Connection {disconnect = fdisconnect s,
-                                    runRaw = frunRaw s}
-
 dataStmHdrQueryNotif = 1  -- query notifications
 dataStmHdrTransDescr = 2  -- MARS transaction descriptor (required)
 dataStmHdrTraceActivity = 3
@@ -499,6 +492,8 @@ putDataStmHeaders headers = do
     putLazyByteString headersbuf
 
 
+
+
 sendSqlBatch72 :: Handle -> [DataStmHeader] -> String -> IO ()
 sendSqlBatch72 s headers query = do
     let putContent = do
@@ -508,15 +503,11 @@ sendSqlBatch72 s headers query = do
     B.hPutStr s $ runPut $ serializePacket packSQLBatch packetbuf
 
 
-fdisconnect :: Handle -> IO ()
-fdisconnect = hClose
-
-frunRaw :: Handle -> String -> IO ()
-frunRaw s query = do
+exec :: Handle -> String -> IO [Token]
+exec s query = do
     let headers = [DataStmTransDescrHdr 0 1]
     sendSqlBatch72 s headers query
     (resptype, _, respbuf) <- getPacket s
     let tokens = LG.runGet parseTokens respbuf
         errors = filter isTokError tokens
-    print tokens
-    fail "errors"
+    return tokens

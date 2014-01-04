@@ -3,6 +3,7 @@ module Main where
 
 import Control.Exception
 import Database.Mssql.Tds
+import Database.Mssql.Connection
 import Database.HDBC
 import Data.Binary.Put
 import Data.Binary.Strict.Get
