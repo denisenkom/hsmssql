@@ -107,4 +107,12 @@ test_runRaw = do
     runRaw conn "select 1"
     disconnect conn
 
+test_statement = do
+    conn <- connect
+    stm <- prepare conn "select 1 as fld"
+    executeRaw stm
+    names <- getColumnNames stm
+    assertEqual ["fld"] names
+
+
 main = htfMain htf_thisModulesTests

@@ -54,6 +54,10 @@ isTokLoginAck _ = False
 isTokError (TokError _ _ _ _ _ _ _) = True
 isTokError _ = False
 
+isTokMetaData (TokColMetaData _ _) = True
+isTokMetaData TokColMetaDataEmpty = True
+isTokMetaData _ = False
+
 data EnvChange = PacketSize Int Int
      deriving(Eq, Show)
 
