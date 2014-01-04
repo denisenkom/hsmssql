@@ -47,7 +47,7 @@ data Token = TokError {number :: Word32,
            | TokDone Word16 Word16 Word64
            | TokZero
            | TokColMetaDataEmpty
-           | TokColMetaData [ColMetaData]
+           | TokColMetaData [ColMetaData] [Token]
            | TokRow [Int]
      deriving(Eq, Show)
 
@@ -308,6 +308,29 @@ parseTypeInfo = do
     typeid <- LG.getWord8
     return $ TypeInfo typeid
 
+parseRow :: [ColMetaData] -> LG.Get Token
+parseRow cols = do
+    val <- LG.getWord32le
+    return $ TokRow [fromIntegral val]
+
+parseRowM :: [ColMetaData] -> LG.Get (Maybe Token)
+parseRowM cols = do
+    tok <- LG.getWord8
+    case tok of
+        209 -> do
+            row <- parseRow cols
+            return $ Just row
+        otherwise -> return Nothing
+
+parseRows :: [ColMetaData] -> LG.Get [Token]
+parseRows cols = do
+    rowm <- LG.lookAheadM $ parseRowM cols
+    case rowm of
+        Just row -> do
+            rows <- parseRows cols
+            return (row:rows)
+        Nothing -> return []
+
 parseColMetaData72 :: LG.Get Token
 parseColMetaData72 = do
     let parseCol = do
@@ -319,7 +342,8 @@ parseColMetaData72 = do
         parseMeta 0xffff = return TokColMetaDataEmpty
         parseMeta cnt = do
             cols <- parseCols cnt
-            return $ TokColMetaData cols
+            rows <- parseRows cols
+            return $ TokColMetaData cols rows
         parseCols 0 = return []
         parseCols cnt = do
             col <- parseCol
@@ -337,10 +361,6 @@ parseLoginAck = do
     progname <- getBVarChar
     progver <- LG.getWord32be
     return $ TokLoginAck iface tdsver progname progver
-
-parseRow cols = do
-    val <- LG.getWord32le
-    return $ TokRow [fromIntegral val]
 
 parseError = do
     LG.getWord16le
@@ -385,8 +405,6 @@ parseToken = do
             parseError
         173 -> do
             parseLoginAck
-        209 -> do
-            parseRow []
         227 -> do
             parseEnvChange
         253 -> do
