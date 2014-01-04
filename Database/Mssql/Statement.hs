@@ -17,7 +17,8 @@ newSth conn query =
        let sstate = SState {conn = conn, squery = query,
                             coldefmv = newcoldefmv}
            retval = Statement {executeRaw = fexecuteRaw sstate,
-                               getColumnNames = fgetColumnNames sstate}
+                               getColumnNames = fgetColumnNames sstate,
+                               fetchRow = ffetchRow sstate}
        return retval
 
 
@@ -38,3 +39,8 @@ fgetColumnNames :: SState -> IO [(String)]
 fgetColumnNames sstate =
     do c <- readMVar (coldefmv sstate)
        return (map fst c)
+
+
+ffetchRow :: SState -> IO (Maybe [SqlValue])
+ffetchRow sstate =
+    do return Nothing
