@@ -9,13 +9,19 @@ import System.IO
 data SState =
     SState { conn :: Handle,
              squery :: String,
-             coldefmv :: MVar [(String, SqlColDesc)] }
+             coldefmv :: MVar [(String, SqlColDesc)],
+             tokenstm :: MVar [Token],
+             metadatatok :: MVar Token}
 
 newSth :: Handle -> String -> IO Statement
 newSth conn query =
     do newcoldefmv <- newMVar []
+       tokenstm <- newMVar []
+       metadatatok <- newMVar TokColMetaDataEmpty
        let sstate = SState {conn = conn, squery = query,
-                            coldefmv = newcoldefmv}
+                            coldefmv = newcoldefmv,
+                            tokenstm = tokenstm,
+                            metadatatok = metadatatok}
            retval = Statement {executeRaw = fexecuteRaw sstate,
                                getColumnNames = fgetColumnNames sstate,
                                fetchRow = ffetchRow sstate}
@@ -31,9 +37,21 @@ fexecuteRaw sstate =
            cols = metadataCols metadata
            coldef (ColMetaData usertype flags ti name) =
                 (name, SqlColDesc SqlCharT Nothing Nothing Nothing Nothing)
+       print 1
        swapMVar (coldefmv sstate) [coldef col | col <- cols]
+       print 2
+       swapMVar (tokenstm sstate) tokens
+       print 3
+       swapMVar (metadatatok sstate) metadata
+       print 4
        return ()
 
+convertVals :: [Int] -> [SqlValue]
+convertVals [] = []
+convertVals (val:xs) = (SqlInt32 . fromIntegral) val : convertVals xs
+
+decodeRow :: Token -> [SqlValue]
+decodeRow (TokRow vals) = convertVals vals
 
 fgetColumnNames :: SState -> IO [(String)]
 fgetColumnNames sstate =
@@ -43,4 +61,7 @@ fgetColumnNames sstate =
 
 ffetchRow :: SState -> IO (Maybe [SqlValue])
 ffetchRow sstate =
-    do return Nothing
+    do metadata <- readMVar (metadatatok sstate)
+       case metadata of
+            TokColMetaData _ rows -> (return . Just . decodeRow . head) rows
+            otherwise -> return Nothing

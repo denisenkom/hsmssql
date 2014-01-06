@@ -114,7 +114,7 @@ test_statement = do
     names <- getColumnNames stm
     assertEqual ["fld"] names
     rows <- fetchAllRows stm
-    assertEqual [[SqlInt32 1]] rows
+    assertEqual [[SqlInt32 2]] rows
 
 
 main = htfMain htf_thisModulesTests
