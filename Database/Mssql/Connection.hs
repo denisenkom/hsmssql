@@ -16,8 +16,16 @@ import System.IO
 connectMssql :: String -> String -> String -> String -> IO Impl.Connection
 connectMssql host inst username password = do
     port <- getPort host inst
+    let hint = Sock.defaultHints {Sock.addrFlags = [Sock.AI_NUMERICSERV],
+                                  Sock.addrSocketType = Sock.Stream}
+    addresses <- Sock.getAddrInfo (Just hint) (Just host) ((Just . show) port)
+    let address = head addresses
+    sock <- Sock.socket (Sock.addrFamily address) Sock.Stream (Sock.addrProtocol address)
+    Sock.connect sock (Sock.addrAddress address)
+    Sock.setSocketOption sock Sock.RecvTimeOut 1000
+    Sock.setSocketOption sock Sock.SendTimeOut 1000
+    s <- Sock.socketToHandle sock ReadWriteMode
 
-    s <- Net.connectTo host (Net.PortNumber $ Sock.PortNum port)
     -- sending prelogin request
     let instbytes = B.snoc (E.encodeLazyByteString ASCII inst) 0
         prelogin = Map.fromList [(preloginVersion, B.pack [0, 0, 0, 0, 0, 0]),
