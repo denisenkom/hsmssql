@@ -13,7 +13,7 @@ library
     build-depends:
         base,
         bytestring == 0.10.*,
-        split == 0.1.*,
+        split,
         utf8-string == 0.3.*,
         containers == 0.5.*,
         encoding == 0.6.*,
@@ -34,7 +34,7 @@ test-suite mssql-tests
         base,
         HTF == 0.11.*,
         bytestring == 0.10.*,
-        split == 0.1.*,
+        split,
         utf8-string == 0.3.*,
         containers == 0.5.*,
         encoding == 0.6.*,
