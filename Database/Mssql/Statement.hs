@@ -37,13 +37,9 @@ fexecuteRaw sstate =
            cols = metadataCols metadata
            coldef (ColMetaData usertype flags ti name) =
                 (name, SqlColDesc SqlCharT Nothing Nothing Nothing Nothing)
-       print 1
        swapMVar (coldefmv sstate) [coldef col | col <- cols]
-       print 2
        swapMVar (tokenstm sstate) tokens
-       print 3
        swapMVar (metadatatok sstate) metadata
-       print 4
        return ()
 
 convertVals :: [Int] -> [SqlValue]
@@ -63,5 +59,10 @@ ffetchRow :: SState -> IO (Maybe [SqlValue])
 ffetchRow sstate =
     do metadata <- readMVar (metadatatok sstate)
        case metadata of
-            TokColMetaData _ rows -> (return . Just . decodeRow . head) rows
+            TokColMetaData _ [] -> return Nothing
+            TokColMetaData cols rows -> do
+                let row = head rows
+                    remrows = tail rows
+                swapMVar (metadatatok sstate) (TokColMetaData cols remrows)
+                return $ (Just . decodeRow) row
             otherwise -> return Nothing
