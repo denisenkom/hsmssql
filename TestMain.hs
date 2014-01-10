@@ -11,6 +11,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Map as M
 import Data.Char (ord)
+import Data.Maybe
 import System.Environment
 import Test.Framework
 
@@ -80,7 +81,7 @@ test_sendLogin =
 
 connect = do
     hoststr <- getEnv "HOST"
-    inst <- getEnv "INSTANCE"
+    inst <- fmap (fromMaybe "") (lookupEnv "INSTANCE")
     password <- getEnv "SQLPASSWORD"
     username <- getEnv "SQLUSER"
     connectMssql hoststr inst username password
@@ -91,12 +92,12 @@ test_connect = do
 
 test_badPwd = do
     hoststr <- getEnv "HOST"
-    inst <- getEnv "INSTANCE"
+    inst <- fmap (fromMaybe "") (lookupEnv "INSTANCE")
     password <- getEnv "SQLPASSWORD"
     username <- getEnv "SQLUSER"
     let handler :: SomeException -> IO ()
         handler e = return ()
-        doConnect = connectMssql hoststr inst username (password ++ "bad")
+        doConnect = connectMssql hoststr inst (username ++ "bad") (password ++ "bad")
         try = do
             doConnect
             fail "Should fail with bad password"
