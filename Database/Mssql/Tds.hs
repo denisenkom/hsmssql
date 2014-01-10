@@ -461,7 +461,7 @@ getPort host inst = do
         then do
             instances <- queryInstances host
             let ports = catMaybes [Map.lookup "tcp" i| i <- instances, isInst inst i]
-            let port = htons (read (head ports) :: Word16)
+            let port = (read (head ports) :: Word16)
             return port
         else return 1433
 
