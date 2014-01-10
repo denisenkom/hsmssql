@@ -339,12 +339,21 @@ getBVarChar = do
 parseTypeInfo :: LG.Get TypeInfo
 parseTypeInfo = do
     typeid <- LG.getWord8
-    return $ TypeInfo typeid
+    case typeid of
+        56 -> return $ TypeInfo typeid
+        109 -> do
+            size <- LG.getWord8
+            return $ TypeInfo typeid
+        otherwise -> fail ("unknown typeid: " ++ (show typeid))
 
 parseRowCol :: ColMetaData -> LG.Get Int
-parseRowCol col = do
-    val <- LG.getWord32le
-    return $ fromIntegral val
+parseRowCol (ColMetaData _ _ ti _) = do
+    case ti of
+        TypeInfo 56 -> do
+            val <- LG.getWord32le
+            return $ fromIntegral val
+        TypeInfo 109 -> do
+            size <- LG.getWord8
 
 parseRowHelper :: [ColMetaData] -> LG.Get [Int]
 parseRowHelper [] = return []

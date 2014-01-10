@@ -117,5 +117,14 @@ test_statement = do
     rows <- fetchAllRows stm
     assertEqual [[SqlInt32 1, SqlInt32 2]] rows
 
+test_types = do
+    conn <- connect
+    stm <- prepare conn "select cast(1.2 as float)"
+    executeRaw stm
+    names <- getColumnNames stm
+    assertEqual ["fld1", "fld2"] names
+    rows <- fetchAllRows stm
+    assertEqual [[SqlInt32 1, SqlInt32 2]] rows
+
 
 main = htfMain htf_thisModulesTests
