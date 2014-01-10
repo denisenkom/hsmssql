@@ -110,12 +110,12 @@ test_runRaw = do
 
 test_statement = do
     conn <- connect
-    stm <- prepare conn "select 1 as fld"
+    stm <- prepare conn "select 1 as fld1, 2 as fld2"
     executeRaw stm
     names <- getColumnNames stm
-    assertEqual ["fld"] names
+    assertEqual ["fld1", "fld2"] names
     rows <- fetchAllRows stm
-    assertEqual [[SqlInt32 1]] rows
+    assertEqual [[SqlInt32 1, SqlInt32 2]] rows
 
 
 main = htfMain htf_thisModulesTests

@@ -341,18 +341,25 @@ parseTypeInfo = do
     typeid <- LG.getWord8
     return $ TypeInfo typeid
 
-parseRow :: [ColMetaData] -> LG.Get Token
-parseRow cols = do
+parseRowCol :: ColMetaData -> LG.Get Int
+parseRowCol col = do
     val <- LG.getWord32le
-    return $ TokRow [fromIntegral val]
+    return $ fromIntegral val
+
+parseRowHelper :: [ColMetaData] -> LG.Get [Int]
+parseRowHelper [] = return []
+parseRowHelper (col:xs) = do
+    val <- parseRowCol col
+    vals <- parseRowHelper xs
+    return $ val:vals
 
 parseRowM :: [ColMetaData] -> LG.Get (Maybe Token)
 parseRowM cols = do
     tok <- LG.getWord8
     case tok of
         209 -> do
-            row <- parseRow cols
-            return $ Just row
+            vals <- parseRowHelper cols
+            return $ Just (TokRow vals)
         otherwise -> return Nothing
 
 parseRows :: [ColMetaData] -> LG.Get [Token]
