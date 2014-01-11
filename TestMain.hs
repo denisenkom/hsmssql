@@ -121,10 +121,18 @@ test_types = do
     conn <- connect
     let tests = [("1.5 as float", SqlDouble 1.5),
                  ("1.5 as real", SqlDouble 1.5),
-                 ("3 as bigint", SqlInt32 3),
+                 ("3 as bigint", SqlInt64 3),
+                 ("-9223372036854775808 as bigint", SqlInt64 (-9223372036854775808)),
+                 ("9223372036854775807 as bigint", SqlInt64 9223372036854775807),
                  ("3 as int", SqlInt32 3),
+                 ("-2147483648 as int", SqlInt32 (-2147483648)),
+                 ("2147483647 as int", SqlInt32 2147483647),
                  ("3 as smallint", SqlInt32 3),
-                 ("3 as tinyint", SqlInt32 3)]
+                 ("-32768 as smallint", SqlInt32 (-32768)),
+                 ("32767 as smallint", SqlInt32 32767),
+                 ("3 as tinyint", SqlInt32 3),
+                 ("0 as tinyint", SqlInt32 0),
+                 ("255 as tinyint", SqlInt32 255)]
         runTests [] = return ()
         runTests ((sql, val):xs) = do
             stm <- prepare conn ("select cast(" ++ sql ++ ")")
