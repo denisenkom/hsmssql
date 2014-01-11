@@ -5,6 +5,7 @@ import Control.Concurrent.MVar
 import Database.HDBC
 import Database.HDBC.Types
 import System.IO
+import GHC.Float
 
 data SState =
     SState { conn :: Handle,
@@ -44,8 +45,12 @@ fexecuteRaw sstate =
 
 convertVals :: [TdsValue] -> [SqlValue]
 convertVals [] = []
+convertVals (TdsInt1 v:xs) = SqlInt32 (fromIntegral v) : convertVals xs
+convertVals (TdsInt2 v:xs) = SqlInt32 (fromIntegral v) : convertVals xs
 convertVals (TdsInt4 v:xs) = SqlInt32 v : convertVals xs
+convertVals (TdsInt8 v:xs) = SqlInt64 v : convertVals xs
 convertVals (TdsFloat v:xs) = SqlDouble v : convertVals xs
+convertVals (TdsReal v:xs) = SqlDouble (float2Double v) : convertVals xs
 
 decodeRow :: Token -> [SqlValue]
 decodeRow (TokRow vals) = convertVals vals

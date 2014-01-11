@@ -119,14 +119,19 @@ test_statement = do
 
 test_types = do
     conn <- connect
-    let tests = [("1.2 as float", SqlDouble 1.2),
-                 ("1.2 as real", SqlDouble 1.2)]
+    let tests = [("1.5 as float", SqlDouble 1.5),
+                 ("1.5 as real", SqlDouble 1.5),
+                 ("3 as bigint", SqlInt32 3),
+                 ("3 as int", SqlInt32 3),
+                 ("3 as smallint", SqlInt32 3),
+                 ("3 as tinyint", SqlInt32 3)]
         runTests [] = return ()
         runTests ((sql, val):xs) = do
             stm <- prepare conn ("select cast(" ++ sql ++ ")")
             executeRaw stm
             rows <- fetchAllRows stm
             assertEqual [[val]] rows
+            runTests xs
 
     runTests tests
 

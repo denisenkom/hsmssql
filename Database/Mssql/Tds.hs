@@ -64,6 +64,7 @@ data EnvChange = PacketSize Int Int
      deriving(Eq, Show)
 
 data TypeInfo = TypeInt4
+              | TypeIntN Word8
               | TypeFltN Word8
      deriving(Eq, Show)
 
@@ -71,7 +72,10 @@ data ColMetaData = ColMetaData Word32 Word16 TypeInfo String
      deriving(Eq, Show)
 
 data TdsValue = TdsNull
+              | TdsInt1 Word8
+              | TdsInt2 Int16
               | TdsInt4 Int32
+              | TdsInt8 Int64
               | TdsFloat Double
               | TdsReal Float
      deriving(Eq, Show)
@@ -351,9 +355,12 @@ parseTypeInfo = do
     typeid <- LG.getWord8
     case typeid of
         56 -> return TypeInt4
+        38 -> do
+            size <- LG.getWord8
+            return $ TypeIntN size
         109 -> do
             size <- LG.getWord8
-            return $ TypeFltN typeid
+            return $ TypeFltN size
         otherwise -> fail ("unknown typeid: " ++ (show typeid))
 
 parseRowCol :: ColMetaData -> LG.Get TdsValue
@@ -362,6 +369,22 @@ parseRowCol (ColMetaData _ _ ti _) = do
         TypeInt4 -> do
             val <- LG.getWord32le
             return $ TdsInt4 (fromIntegral val)
+        TypeIntN _ -> do
+            size <- LG.getWord8
+            case size of
+                0 -> return TdsNull
+                1 -> do
+                    val <- LG.getWord8
+                    return $ TdsInt1 val
+                2 -> do
+                    val <- LG.getWord16le
+                    return $ TdsInt2 (fromIntegral val)
+                4 -> do
+                    val <- LG.getWord32le
+                    return $ TdsInt4 (fromIntegral val)
+                8 -> do
+                    val <- LG.getWord64le
+                    return $ TdsInt8 (fromIntegral val)
         TypeFltN _ -> do
             size <- LG.getWord8
             case size of
