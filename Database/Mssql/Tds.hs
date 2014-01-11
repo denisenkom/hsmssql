@@ -64,6 +64,7 @@ data EnvChange = PacketSize Int Int
      deriving(Eq, Show)
 
 data TypeInfo = TypeInt4
+              | TypeGuid Word8
               | TypeIntN Word8
               | TypeFltN Word8
      deriving(Eq, Show)
@@ -78,6 +79,7 @@ data TdsValue = TdsNull
               | TdsInt8 Int64
               | TdsFloat Double
               | TdsReal Float
+              | TdsGuid BS.ByteString
      deriving(Eq, Show)
 
 
@@ -355,6 +357,9 @@ parseTypeInfo = do
     typeid <- LG.getWord8
     case typeid of
         56 -> return TypeInt4
+        36 -> do
+            size <- LG.getWord8
+            return $ TypeGuid size
         38 -> do
             size <- LG.getWord8
             return $ TypeIntN size
@@ -369,6 +374,10 @@ parseRowCol (ColMetaData _ _ ti _) = do
         TypeInt4 -> do
             val <- LG.getWord32le
             return $ TdsInt4 (fromIntegral val)
+        TypeGuid _ -> do
+            size <- LG.getWord8
+            bs <- LG.getByteString (fromIntegral size)
+            return $ TdsGuid bs
         TypeIntN _ -> do
             size <- LG.getWord8
             case size of

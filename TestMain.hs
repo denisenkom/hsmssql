@@ -132,7 +132,8 @@ test_types = do
                  ("32767 as smallint", SqlInt32 32767),
                  ("3 as tinyint", SqlInt32 3),
                  ("0 as tinyint", SqlInt32 0),
-                 ("255 as tinyint", SqlInt32 255)]
+                 ("255 as tinyint", SqlInt32 255),
+                 ("'0E984725-C51C-4BF4-9960-E1C80E27ABA0' as uniqueidentifier", SqlByteString (BS.pack [0x25,0x47,0x98,0x0E, 0x1C,0xC5,0xF4,0x4B, 0x99,0x60,0xE1,0xC8,0x0E,0x27,0xAB,0xA0]))]
         runTests [] = return ()
         runTests ((sql, val):xs) = do
             stm <- prepare conn ("select cast(" ++ sql ++ ")")
