@@ -8,12 +8,14 @@ import Data.Bits
 import Data.Sequence((|>))
 import qualified Data.Sequence as Seq
 import Data.Word
+import Data.Int
 import Network.Socket.ByteString
 import qualified Data.Binary.Get as LG
 import Data.Binary.Strict.Get
 import Data.Binary.Put
 import qualified Data.Encoding as E
 import Data.Encoding.UTF16
+import Data.Binary.IEEE754
 --import Data.Text.Encoding
 --import qualified Data.Text as T
 import qualified Data.Map as Map
@@ -45,7 +47,7 @@ data Token = TokError {number :: Word32,
            | TokZero
            | TokColMetaDataEmpty
            | TokColMetaData [ColMetaData] [Token]
-           | TokRow [Int]
+           | TokRow [TdsValue]
      deriving(Eq, Show)
 
 isTokLoginAck (TokLoginAck _ _ _ _) = True
@@ -61,11 +63,19 @@ isTokMetaData _ = False
 data EnvChange = PacketSize Int Int
      deriving(Eq, Show)
 
-data TypeInfo = TypeInfo Word8
+data TypeInfo = TypeInt4
+              | TypeFltN Word8
      deriving(Eq, Show)
 
 data ColMetaData = ColMetaData Word32 Word16 TypeInfo String
      deriving(Eq, Show)
+
+data TdsValue = TdsNull
+              | TdsInt4 Int32
+              | TdsFloat Double
+              | TdsReal Float
+     deriving(Eq, Show)
+
 
 parseInstancesImpl :: Get ([String])
 parseInstancesImpl = do
@@ -340,22 +350,30 @@ parseTypeInfo :: LG.Get TypeInfo
 parseTypeInfo = do
     typeid <- LG.getWord8
     case typeid of
-        56 -> return $ TypeInfo typeid
+        56 -> return TypeInt4
         109 -> do
             size <- LG.getWord8
-            return $ TypeInfo typeid
+            return $ TypeFltN typeid
         otherwise -> fail ("unknown typeid: " ++ (show typeid))
 
-parseRowCol :: ColMetaData -> LG.Get Int
+parseRowCol :: ColMetaData -> LG.Get TdsValue
 parseRowCol (ColMetaData _ _ ti _) = do
     case ti of
-        TypeInfo 56 -> do
+        TypeInt4 -> do
             val <- LG.getWord32le
-            return $ fromIntegral val
-        TypeInfo 109 -> do
+            return $ TdsInt4 (fromIntegral val)
+        TypeFltN _ -> do
             size <- LG.getWord8
+            case size of
+                0 -> return TdsNull
+                4 -> do
+                    val <- getFloat32le
+                    return $ TdsReal val
+                8 -> do
+                    val <- getFloat64le
+                    return $ TdsFloat val
 
-parseRowHelper :: [ColMetaData] -> LG.Get [Int]
+parseRowHelper :: [ColMetaData] -> LG.Get [TdsValue]
 parseRowHelper [] = return []
 parseRowHelper (col:xs) = do
     val <- parseRowCol col

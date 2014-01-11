@@ -119,12 +119,16 @@ test_statement = do
 
 test_types = do
     conn <- connect
-    stm <- prepare conn "select cast(1.2 as float)"
-    executeRaw stm
-    names <- getColumnNames stm
-    assertEqual ["fld1", "fld2"] names
-    rows <- fetchAllRows stm
-    assertEqual [[SqlInt32 1, SqlInt32 2]] rows
+    let tests = [("1.2 as float", SqlDouble 1.2),
+                 ("1.2 as real", SqlDouble 1.2)]
+        runTests [] = return ()
+        runTests ((sql, val):xs) = do
+            stm <- prepare conn ("select cast(" ++ sql ++ ")")
+            executeRaw stm
+            rows <- fetchAllRows stm
+            assertEqual [[val]] rows
+
+    runTests tests
 
 
 main = htfMain htf_thisModulesTests
