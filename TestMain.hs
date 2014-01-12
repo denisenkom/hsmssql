@@ -119,24 +119,24 @@ test_statement = do
 
 test_types = do
     conn <- connect
-    let tests = [("1.5 as float", SqlDouble 1.5),
-                 ("1.5 as real", SqlDouble 1.5),
-                 ("3 as bigint", SqlInt64 3),
-                 ("-9223372036854775808 as bigint", SqlInt64 (-9223372036854775808)),
-                 ("9223372036854775807 as bigint", SqlInt64 9223372036854775807),
-                 ("3 as int", SqlInt32 3),
-                 ("-2147483648 as int", SqlInt32 (-2147483648)),
-                 ("2147483647 as int", SqlInt32 2147483647),
-                 ("3 as smallint", SqlInt32 3),
-                 ("-32768 as smallint", SqlInt32 (-32768)),
-                 ("32767 as smallint", SqlInt32 32767),
-                 ("3 as tinyint", SqlInt32 3),
-                 ("0 as tinyint", SqlInt32 0),
-                 ("255 as tinyint", SqlInt32 255),
-                 ("'0E984725-C51C-4BF4-9960-E1C80E27ABA0' as uniqueidentifier", SqlByteString (BS.pack [0x25,0x47,0x98,0x0E, 0x1C,0xC5,0xF4,0x4B, 0x99,0x60,0xE1,0xC8,0x0E,0x27,0xAB,0xA0]))]
+    let tests = [("1.5", "float", SqlDouble 1.5),
+                 ("1.5", "real", SqlDouble 1.5),
+                 ("3", "bigint", SqlInt64 3),
+                 ("-9223372036854775808", "bigint", SqlInt64 (-9223372036854775808)),
+                 ("9223372036854775807", "bigint", SqlInt64 9223372036854775807),
+                 ("3", "int", SqlInt32 3),
+                 ("-2147483648", "int", SqlInt32 (-2147483648)),
+                 ("2147483647", "int", SqlInt32 2147483647),
+                 ("3", "smallint", SqlInt32 3),
+                 ("-32768", "smallint", SqlInt32 (-32768)),
+                 ("32767", "smallint", SqlInt32 32767),
+                 ("3", "tinyint", SqlInt32 3),
+                 ("0", "tinyint", SqlInt32 0),
+                 ("255", "tinyint", SqlInt32 255),
+                 ("'0E984725-C51C-4BF4-9960-E1C80E27ABA0'", "uniqueidentifier", SqlByteString (BS.pack [0x25,0x47,0x98,0x0E, 0x1C,0xC5,0xF4,0x4B, 0x99,0x60,0xE1,0xC8,0x0E,0x27,0xAB,0xA0]))]
         runTests [] = return ()
-        runTests ((sql, val):xs) = do
-            stm <- prepare conn ("select cast(" ++ sql ++ ")")
+        runTests ((sql, sqltype, val):xs) = do
+            stm <- prepare conn ("select cast(" ++ sql ++ " as " ++ sqltype ++ ")")
             executeRaw stm
             rows <- fetchAllRows stm
             assertEqual [[val]] rows
