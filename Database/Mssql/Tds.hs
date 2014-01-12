@@ -9,6 +9,7 @@ import Data.Sequence((|>))
 import qualified Data.Sequence as Seq
 import Data.Word
 import Data.Int
+import Data.Ratio
 import Network.Socket.ByteString
 import qualified Data.Binary.Get as LG
 import Data.Binary.Strict.Get
@@ -113,6 +114,7 @@ data TdsValue = TdsNull
               | TdsFloat Double
               | TdsReal Float
               | TdsGuid BS.ByteString
+              | TdsDecimal Word8 Word8 Rational
      deriving(Eq, Show)
 
 data Collation = Collation Int Int
@@ -551,6 +553,21 @@ parseRowCol (ColMetaData _ _ ti _) = do
                 8 -> do
                     val <- getFloat64le
                     return $ TdsFloat val
+        TypeDecimalN prec scale -> do
+            size <- LG.getWord8
+            case size of
+                0 -> return TdsNull
+                otherwise -> getDecimal prec scale (fromIntegral size)
+
+decimalFold :: [Word32] -> Integer
+decimalFold = foldr (\v acc -> (fromIntegral v) + (acc `shiftL` 32)) 0
+
+getDecimal prec scale size = do
+    sign <- LG.getWord8
+    ints <- replicateM ((size - 1) `quot` 4) LG.getWord32le
+    let rational = (decimalFold ints) % (10 ^ scale)
+        res = if sign == 0 then (-rational) else rational
+    return $ TdsDecimal prec scale res
 
 parseRowHelper :: [ColMetaData] -> LG.Get [TdsValue]
 parseRowHelper [] = return []

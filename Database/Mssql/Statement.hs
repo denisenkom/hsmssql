@@ -52,6 +52,7 @@ convertVal (TdsFloat v) = SqlDouble v
 convertVal (TdsReal v) = SqlDouble (float2Double v)
 convertVal (TdsGuid v) = SqlByteString v
 convertVal (TdsBool v) = SqlBool v
+convertVal (TdsDecimal _ _ v) = SqlRational v
 
 convertVals :: [TdsValue] -> [SqlValue]
 convertVals [] = []
