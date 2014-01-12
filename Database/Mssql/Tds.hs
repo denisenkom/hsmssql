@@ -63,10 +63,42 @@ isTokMetaData _ = False
 data EnvChange = PacketSize Int Int
      deriving(Eq, Show)
 
-data TypeInfo = TypeInt4
+data TypeInfo = TypeNull
+              | TypeInt1
+              | TypeBit
+              | TypeBitN Word8
+              | TypeInt2
+              | TypeInt4
+              | TypeDateTim4
+              | TypeFlt4
+              | TypeMoney
+              | TypeDateTime
+              | TypeFlt8
+              | TypeMoney4
+              | TypeInt8
               | TypeGuid Word8
               | TypeIntN Word8
+              | TypeDecimalN Word8 Word8
+              | TypeNumericN Word8 Word8
               | TypeFltN Word8
+              | TypeMoneyN Word8
+              | TypeDateTimeN Word8
+              | TypeDateN
+              | TypeTimeN Word8
+              | TypeDateTime2N Word8
+              | TypeDateTimeOffsetN Word8
+              | TypeVarBinary Word16
+              | TypeVarChar Word16 Collation
+              | TypeBinary Word16
+              | TypeChar Word16 Collation
+              | TypeNVarChar Word16 Collation
+              | TypeNChar Word16 Collation
+              | TypeXml
+              | TypeUdt Word16
+              | TypeText Int32 Collation
+              | TypeImage Int32
+              | TypeNText Int32 Collation
+              | TypeVariant Int32
      deriving(Eq, Show)
 
 data ColMetaData = ColMetaData Word32 Word16 TypeInfo String
@@ -80,6 +112,9 @@ data TdsValue = TdsNull
               | TdsFloat Double
               | TdsReal Float
               | TdsGuid BS.ByteString
+     deriving(Eq, Show)
+
+data Collation = Collation Int Int
      deriving(Eq, Show)
 
 
@@ -356,17 +391,121 @@ parseTypeInfo :: LG.Get TypeInfo
 parseTypeInfo = do
     typeid <- LG.getWord8
     case typeid of
-        56 -> return TypeInt4
-        36 -> do
+        0x1f -> return TypeNull
+        0x22 -> do
+            size <- LG.getWord32le
+            numparts <- LG.getWord8
+            forM_ [1..numparts] (\_ -> getUsVarChar)
+            return $ TypeImage (fromIntegral size)
+        0x23 -> do
+            size <- LG.getWord32le
+            col <- getCollation
+            numparts <- LG.getWord8
+            forM_ [1..numparts] (\_ -> getUsVarChar)
+            return $ TypeText (fromIntegral size) col
+        0x24 -> do
             size <- LG.getWord8
             return $ TypeGuid size
-        38 -> do
+        -- 0x25 legacy varbinary
+        0x26 -> do
             size <- LG.getWord8
             return $ TypeIntN size
-        109 -> do
+        -- 0x27 legacy varchar
+        0x28 -> return TypeDateN
+        0x29 -> do
+            scale <- LG.getWord8
+            return $ TypeTimeN scale
+        0x2a -> do
+            scale <- LG.getWord8
+            return $ TypeDateTime2N scale
+        0x2b -> do
+            scale <- LG.getWord8
+            return $ TypeDateTimeOffsetN scale
+        -- 0x2d legacy binary
+        -- 0x2f legacy char
+        0x30 -> return TypeInt1
+        0x32 -> return TypeBit
+        0x34 -> return TypeInt2
+        0x38 -> return TypeInt4
+        -- 0x37 legacy decimal
+        0x3a -> return TypeDateTim4
+        0x3b -> return TypeFlt4
+        0x3c -> return TypeMoney
+        0x3d -> return TypeDateTime
+        0x3e -> return TypeFlt8
+        0x62 -> fail("variant type not implemented")
+        0x63 -> do
+            size <- LG.getWord32le
+            col <- getCollation
+            numparts <- LG.getWord8
+            forM_ [1..numparts] (\_ -> getUsVarChar)
+            return $ TypeNText (fromIntegral size) col
+        0x68 -> do
+            size <- LG.getWord8
+            return $ TypeBitN size
+        0x6a -> do
+            size <- LG.getWord8
+            prec <- LG.getWord8
+            scale <- LG.getWord8
+            return $ TypeDecimalN prec scale
+        0x6c -> do
+            size <- LG.getWord8
+            prec <- LG.getWord8
+            scale <- LG.getWord8
+            return $ TypeDecimalN prec scale
+        0x6d -> do
             size <- LG.getWord8
             return $ TypeFltN size
+        0x6e -> do
+            size <- LG.getWord8
+            return $ TypeMoneyN size
+        0x6f -> do
+            size <- LG.getWord8
+            return $ TypeDateTimeN size
+        0x7a -> return TypeMoney4
+        0x7f -> return TypeInt8
+        0xa5 -> do
+            size <- LG.getWord16le
+            return $ TypeVarBinary size
+        0xa7 -> do
+            size <- LG.getWord16le
+            col <- getCollation
+            return $ TypeVarChar size col
+        0xad -> do
+            size <- LG.getWord16le
+            return $ TypeBinary size
+        0xaf -> do
+            size <- LG.getWord16le
+            col <- getCollation
+            return $ TypeChar size col
+        0xe7 -> do
+            size <- LG.getWord16le
+            col <- getCollation
+            return $ TypeNVarChar size col
+        0xef -> do
+            size <- LG.getWord16le
+            col <- getCollation
+            return $ TypeNChar size col
+        0xf0 -> do
+            size <- LG.getWord16le
+            return $ TypeUdt size
+        0xf1 -> do
+            schemapresent <- LG.getWord8
+            if schemapresent /= 0
+                then do
+                    getBVarChar
+                    getBVarChar
+                    getUsVarChar
+                    return ()
+                else return ()
+            return TypeXml
         otherwise -> fail ("unknown typeid: " ++ (show typeid))
+
+getCollation :: LG.Get Collation
+getCollation = do
+    lcidandflags <- LG.getWord32le
+    sordid <- LG.getWord8
+    return $ Collation (fromIntegral lcidandflags) (fromIntegral sordid)
 
 parseRowCol :: ColMetaData -> LG.Get TdsValue
 parseRowCol (ColMetaData _ _ ti _) = do
