@@ -52,6 +52,7 @@ convertVals (TdsInt8 v:xs) = SqlInt64 v : convertVals xs
 convertVals (TdsFloat v:xs) = SqlDouble v : convertVals xs
 convertVals (TdsReal v:xs) = SqlDouble (float2Double v) : convertVals xs
 convertVals (TdsGuid v:xs) = SqlByteString v : convertVals xs
+convertVals (TdsBool v:xs) = SqlBool v : convertVals xs
 
 decodeRow :: Token -> [SqlValue]
 decodeRow (TokRow vals) = convertVals vals

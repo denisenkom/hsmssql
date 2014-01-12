@@ -109,6 +109,7 @@ data TdsValue = TdsNull
               | TdsInt2 Int16
               | TdsInt4 Int32
               | TdsInt8 Int64
+              | TdsBool Bool
               | TdsFloat Double
               | TdsReal Float
               | TdsGuid BS.ByteString
@@ -533,6 +534,13 @@ parseRowCol (ColMetaData _ _ ti _) = do
                 8 -> do
                     val <- LG.getWord64le
                     return $ TdsInt8 (fromIntegral val)
+        TypeBitN _ -> do
+            size <- LG.getWord8
+            case size of
+                0 -> return TdsNull
+                1 -> do
+                    val <- LG.getWord8
+                    return $ TdsBool (if val == 0 then False else True)
         TypeFltN _ -> do
             size <- LG.getWord8
             case size of
