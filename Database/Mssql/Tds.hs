@@ -115,6 +115,8 @@ data TdsValue = TdsNull
               | TdsReal Float
               | TdsGuid BS.ByteString
               | TdsDecimal Word8 Word8 Rational
+              | TdsMoney Int64
+              | TdsSmallMoney Int32
      deriving(Eq, Show)
 
 data Collation = Collation Int Int
@@ -558,6 +560,22 @@ parseRowCol (ColMetaData _ _ ti _) = do
             case size of
                 0 -> return TdsNull
                 otherwise -> getDecimal prec scale (fromIntegral size)
+        TypeNumericN prec scale -> do
+            size <- LG.getWord8
+            case size of
+                0 -> return TdsNull
+                otherwise -> getDecimal prec scale (fromIntegral size)
+        TypeMoneyN _ -> do
+            size <- LG.getWord8
+            case size of
+                0 -> return TdsNull
+                4 -> do
+                    val <- LG.getWord32le
+                    return $ TdsSmallMoney (fromIntegral val)
+                8 -> do
+                    hi <- LG.getWord32le
+                    lo <- LG.getWord32le
+                    return $ TdsMoney (((fromIntegral hi) `shiftL` 32) + (fromIntegral lo))
 
 decimalFold :: [Word32] -> Integer
 decimalFold = foldr (\v acc -> (fromIntegral v) + (acc `shiftL` 32)) 0

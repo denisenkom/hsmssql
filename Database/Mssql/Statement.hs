@@ -2,6 +2,7 @@ module Database.Mssql.Statement where
 import Database.Mssql.Tds
 
 import Control.Concurrent.MVar
+import Data.Ratio
 import Database.HDBC
 import Database.HDBC.Types
 import System.IO
@@ -53,6 +54,8 @@ convertVal (TdsReal v) = SqlDouble (float2Double v)
 convertVal (TdsGuid v) = SqlByteString v
 convertVal (TdsBool v) = SqlBool v
 convertVal (TdsDecimal _ _ v) = SqlRational v
+convertVal (TdsMoney v) = SqlRational $ (fromIntegral v) % 10000
+convertVal (TdsSmallMoney v) = SqlRational $ (fromIntegral v) % 10000
 
 convertVals :: [TdsValue] -> [SqlValue]
 convertVals [] = []
