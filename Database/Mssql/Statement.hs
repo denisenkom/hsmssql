@@ -43,16 +43,19 @@ fexecuteRaw sstate =
        swapMVar (metadatatok sstate) metadata
        return ()
 
+convertVal :: TdsValue -> SqlValue
+convertVal (TdsInt1 v) = SqlInt32 (fromIntegral v)
+convertVal (TdsInt2 v) = SqlInt32 (fromIntegral v)
+convertVal (TdsInt4 v) = SqlInt32 v
+convertVal (TdsInt8 v) = SqlInt64 v
+convertVal (TdsFloat v) = SqlDouble v
+convertVal (TdsReal v) = SqlDouble (float2Double v)
+convertVal (TdsGuid v) = SqlByteString v
+convertVal (TdsBool v) = SqlBool v
+
 convertVals :: [TdsValue] -> [SqlValue]
 convertVals [] = []
-convertVals (TdsInt1 v:xs) = SqlInt32 (fromIntegral v) : convertVals xs
-convertVals (TdsInt2 v:xs) = SqlInt32 (fromIntegral v) : convertVals xs
-convertVals (TdsInt4 v:xs) = SqlInt32 v : convertVals xs
-convertVals (TdsInt8 v:xs) = SqlInt64 v : convertVals xs
-convertVals (TdsFloat v:xs) = SqlDouble v : convertVals xs
-convertVals (TdsReal v:xs) = SqlDouble (float2Double v) : convertVals xs
-convertVals (TdsGuid v:xs) = SqlByteString v : convertVals xs
-convertVals (TdsBool v:xs) = SqlBool v : convertVals xs
+convertVals (v:xs) = convertVal v : convertVals xs
 
 decodeRow :: Token -> [SqlValue]
 decodeRow (TokRow vals) = convertVals vals
