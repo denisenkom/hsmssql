@@ -3,6 +3,9 @@ import Database.Mssql.Tds
 
 import Control.Concurrent.MVar
 import Data.Ratio
+import Data.Time.Calendar
+import Data.Time.Clock
+import Data.Time.LocalTime
 import Database.HDBC
 import Database.HDBC.Types
 import System.IO
@@ -56,6 +59,17 @@ convertVal (TdsBool v) = SqlBool v
 convertVal (TdsDecimal _ _ v) = SqlRational v
 convertVal (TdsMoney v) = SqlRational $ (fromIntegral v) % 10000
 convertVal (TdsSmallMoney v) = SqlRational $ (fromIntegral v) % 10000
+convertVal (TdsDateTime days timefrac) = SqlLocalTime time
+    where day = addDays (fromIntegral days) (fromGregorian 1900 1 1)
+          picoseconds = round $ ((fromIntegral timefrac) * 10^12) % 300
+          daytime = timeToTimeOfDay $ picosecondsToDiffTime picoseconds
+          time = LocalTime day daytime
+
+convertVal (TdsSmallDateTime days minutes) = SqlLocalTime time
+    where day = addDays (fromIntegral days) (fromGregorian 1900 1 1)
+          daytime = timeToTimeOfDay $ secondsToDiffTime ((fromIntegral minutes) * 60)
+          time = LocalTime day daytime
+
 
 convertVals :: [TdsValue] -> [SqlValue]
 convertVals [] = []

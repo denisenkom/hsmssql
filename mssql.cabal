@@ -22,7 +22,8 @@ library
         HDBC == 2.3.*,
         MissingH == 1.2.*,
         network == 2.4.*,
-        data-binary-ieee754
+        data-binary-ieee754,
+        time
     exposed-modules:
         Database.Mssql.Tds
     Default-language:  Haskell2010
@@ -44,5 +45,6 @@ test-suite mssql-tests
         HDBC == 2.3.*,
         MissingH == 1.2.*,
         network == 2.4.*,
-        data-binary-ieee754
+        data-binary-ieee754,
+        time
     default-language:   Haskell2010

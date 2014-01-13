@@ -13,6 +13,8 @@ import qualified Data.Map as M
 import Data.Char (ord)
 import Data.Maybe
 import Data.Ratio
+import Data.Time.Calendar
+import Data.Time.LocalTime
 import System.Environment
 import Test.Framework
 
@@ -143,6 +145,24 @@ test_types = do
                  ("100.1234", "smallmoney", SqlRational 100.1234),
                  ("-214748.3648", "smallmoney", SqlRational (-214748.3648)),
                  ("214748.3647", "smallmoney", SqlRational 214748.3647),
+                 ("'2010-01-02T03:04:05.010'", "datetime",
+                  SqlLocalTime (LocalTime (fromGregorian 2010 1 2)
+                                          (TimeOfDay 3 4 5.01))),
+                 ("'1753-01-01T00:00:00.000'", "datetime",
+                  SqlLocalTime (LocalTime (fromGregorian 1753 1 1)
+                                          (TimeOfDay 0 0 0))),
+                 ("'9999-12-31T23:59:59.997'", "datetime",
+                  SqlLocalTime (LocalTime (fromGregorian 9999 12 31)
+                                          (TimeOfDay 23 59 59.996666666667))),
+                 ("'2010-01-02T03:04:00'", "smalldatetime",
+                  SqlLocalTime (LocalTime (fromGregorian 2010 1 2)
+                                          (TimeOfDay 3 4 0))),
+                 ("'1900-01-01T00:00:00'", "smalldatetime",
+                  SqlLocalTime (LocalTime (fromGregorian 1900 1 1)
+                                          (TimeOfDay 0 0 0))),
+                 ("'2079-06-06T23:59:00'", "smalldatetime",
+                  SqlLocalTime (LocalTime (fromGregorian 2079 6 6)
+                                          (TimeOfDay 23 59 0))),
                  ("'1.5'", "decimal(10,1)", SqlRational 1.5),
                  ("'1.1234'", "decimal(10,4)", SqlRational 1.1234),
                  ("'-100'", "decimal(38)", SqlRational (-100)),
