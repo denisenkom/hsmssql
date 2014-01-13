@@ -48,6 +48,7 @@ fexecuteRaw sstate =
        return ()
 
 convertVal :: TdsValue -> SqlValue
+convertVal TdsNull = SqlNull
 convertVal (TdsInt1 v) = SqlInt32 (fromIntegral v)
 convertVal (TdsInt2 v) = SqlInt32 (fromIntegral v)
 convertVal (TdsInt4 v) = SqlInt32 v
@@ -69,6 +70,9 @@ convertVal (TdsSmallDateTime days minutes) = SqlLocalTime time
     where day = addDays (fromIntegral days) (fromGregorian 1900 1 1)
           daytime = timeToTimeOfDay $ secondsToDiffTime ((fromIntegral minutes) * 60)
           time = LocalTime day daytime
+
+convertVal (TdsDate days) = SqlLocalDate day
+    where day = addDays (fromIntegral days) (fromGregorian 1 1 1)
 
 
 convertVals :: [TdsValue] -> [SqlValue]

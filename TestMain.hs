@@ -163,6 +163,13 @@ test_types = do
                  ("'2079-06-06T23:59:00'", "smalldatetime",
                   SqlLocalTime (LocalTime (fromGregorian 2079 6 6)
                                           (TimeOfDay 23 59 0))),
+                 ("NULL", "date", SqlNull),
+                 ("'2014-01-01'", "date",
+                  SqlLocalDate $ fromGregorian 2014 1 1),
+                 ("'0001-01-01'", "date",
+                  SqlLocalDate $ fromGregorian 1 1 1),
+                 ("'9999-12-31'", "date",
+                  SqlLocalDate $ fromGregorian 9999 12 31),
                  ("'1.5'", "decimal(10,1)", SqlRational 1.5),
                  ("'1.1234'", "decimal(10,4)", SqlRational 1.1234),
                  ("'-100'", "decimal(38)", SqlRational (-100)),

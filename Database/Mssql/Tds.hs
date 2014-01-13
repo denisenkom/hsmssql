@@ -119,6 +119,7 @@ data TdsValue = TdsNull
               | TdsSmallMoney Int32
               | TdsDateTime Int32 Word32
               | TdsSmallDateTime Word16 Word16
+              | TdsDate Int32
      deriving(Eq, Show)
 
 data Collation = Collation Int Int
@@ -590,6 +591,21 @@ parseRowCol (ColMetaData _ _ ti _) = do
                     days <- LG.getWord32le
                     timefrac <- LG.getWord32le
                     return $ TdsDateTime (fromIntegral days) timefrac
+        TypeDateN -> do
+            size <- LG.getWord8
+            case size of
+                0 -> return TdsNull
+                3 -> do
+                    getDate
+
+getDate :: LG.Get TdsValue
+getDate = do
+    b1 <- LG.getWord8
+    b2 <- LG.getWord8
+    b3 <- LG.getWord8
+    let days = ((fromIntegral b1) + (fromIntegral b2) * 256 +
+                (fromIntegral b3) * 256 * 256)
+    return $ TdsDate days
 
 decimalFold :: [Word32] -> Integer
 decimalFold = foldr (\v acc -> (fromIntegral v) + (acc `shiftL` 32)) 0
