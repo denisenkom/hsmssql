@@ -120,6 +120,7 @@ data TdsValue = TdsNull
               | TdsDateTime Int32 Word32
               | TdsSmallDateTime Word16 Word16
               | TdsDate Int32
+              | TdsTime Rational
      deriving(Eq, Show)
 
 data Collation = Collation Int Int
@@ -597,6 +598,18 @@ parseRowCol (ColMetaData _ _ ti _) = do
                 0 -> return TdsNull
                 3 -> do
                     getDate
+        TypeTimeN scale -> do
+            size <- LG.getWord8
+            case size of
+                0 -> return TdsNull
+                otherwise -> do
+                    getTime (fromIntegral scale) (fromIntegral size)
+
+getTime :: Int -> Int -> LG.Get TdsValue
+getTime scale size = do
+    ints <- replicateM size LG.getWord8
+    let time = foldr (\v acc -> (fromIntegral v) + (acc `shiftL` 8)) (0 :: Word64) ints
+    return $ TdsTime ((fromIntegral time) % (10 ^ scale))
 
 getDate :: LG.Get TdsValue
 getDate = do
