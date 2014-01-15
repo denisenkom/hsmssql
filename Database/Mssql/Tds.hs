@@ -122,6 +122,7 @@ data TdsValue = TdsNull
               | TdsDate Int32
               | TdsTime Rational
               | TdsDateTime2 Int32 Rational
+              | TdsDateTimeOffset Int32 Rational Int16
      deriving(Eq, Show)
 
 data Collation = Collation Int Int
@@ -615,6 +616,16 @@ parseRowCol (ColMetaData _ _ ti _) = do
                     secs <- getTime (fromIntegral scale) ((fromIntegral size) - 3)
                     days <- getDate
                     return $ TdsDateTime2 days secs
+        TypeDateTimeOffsetN scale -> do
+            size <- LG.getWord8
+            case size of
+                0 -> return TdsNull
+                otherwise -> do
+                    secs <- getTime (fromIntegral scale) ((fromIntegral size) - 5)
+                    days <- getDate
+                    offset <- LG.getWord16le
+                    return $ TdsDateTimeOffset days secs (fromIntegral offset)
+
 
 getTime :: Int -> Int -> LG.Get Rational
 getTime scale size = do

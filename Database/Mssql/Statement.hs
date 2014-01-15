@@ -83,6 +83,15 @@ convertVal (TdsDateTime2 days secs) = SqlLocalTime $ LocalTime day daytime
           picoseconds = round $ secs * 10^12
           daytime = timeToTimeOfDay $ picosecondsToDiffTime picoseconds
 
+convertVal (TdsDateTimeOffset days secs offset) = res
+    where startday = (fromGregorian 1 1 1)
+          day = addDays (fromIntegral days) startday
+          picoseconds = round $ secs * 10^12
+          daytime = picosecondsToDiffTime picoseconds
+          tz = minutesToTimeZone $ fromIntegral offset
+          utctime = UTCTime day daytime
+          zonedtime = utcToZonedTime tz utctime
+          res = SqlZonedTime zonedtime
 
 convertVals :: [TdsValue] -> [SqlValue]
 convertVals [] = []
