@@ -174,6 +174,9 @@ test_types = do
                  ("'01:02:03.4567891'", "time(7)", SqlLocalTimeOfDay (TimeOfDay 1 2 3.4567891)),
                  ("'00:00:00'", "time(7)", SqlLocalTimeOfDay (TimeOfDay 0 0 0)),
                  ("'23:59:59.9999999'", "time(7)", SqlLocalTimeOfDay (TimeOfDay 23 59 59.9999999)),
+                 ("'2010-01-02T03:04:05.010'", "datetime2",
+                  SqlLocalTime (LocalTime (fromGregorian 2010 1 2)
+                                          (TimeOfDay 3 4 5.01))),
                  ("'1.5'", "decimal(10,1)", SqlRational 1.5),
                  ("'1.1234'", "decimal(10,4)", SqlRational 1.1234),
                  ("'-100'", "decimal(38)", SqlRational (-100)),

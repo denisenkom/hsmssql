@@ -78,6 +78,11 @@ convertVal (TdsTime secs) = SqlLocalTimeOfDay daytime
     where picoseconds = round $ secs * 10^12
           daytime = timeToTimeOfDay $ picosecondsToDiffTime picoseconds
 
+convertVal (TdsDateTime2 days secs) = SqlLocalTime $ LocalTime day daytime
+    where day = addDays (fromIntegral days) (fromGregorian 1 1 1)
+          picoseconds = round $ secs * 10^12
+          daytime = timeToTimeOfDay $ picosecondsToDiffTime picoseconds
+
 
 convertVals :: [TdsValue] -> [SqlValue]
 convertVals [] = []
