@@ -763,8 +763,11 @@ getPort host inst = do
         then do
             instances <- queryInstances host
             let ports = catMaybes [Map.lookup "tcp" i| i <- instances, isInst inst i]
-            let port = (read (head ports) :: Word16)
-            return port
+            if ports == []
+                then fail ("Instance " ++ inst ++ " not found")
+                else do
+                    let port = (read (head ports) :: Word16)
+                    return port
         else return 1433
 
 
