@@ -22,8 +22,6 @@ connectMssql host inst username password = do
     let address = head addresses
     sock <- Sock.socket (Sock.addrFamily address) Sock.Stream (Sock.addrProtocol address)
     Sock.connect sock (Sock.addrAddress address)
-    Sock.setSocketRecvTimeOut sock 30
-    Sock.setSocketSendTimeOut sock 30
     s <- Sock.socketToHandle sock ReadWriteMode
 
     -- sending prelogin request
