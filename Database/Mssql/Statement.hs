@@ -93,6 +93,8 @@ convertVal (TdsDateTimeOffset days secs offset) = res
           zonedtime = utcToZonedTime tz utctime
           res = SqlZonedTime zonedtime
 
+convertVal (TdsVarBinary bs) = SqlByteString bs
+
 convertVals :: [TdsValue] -> [SqlValue]
 convertVals [] = []
 convertVals (v:xs) = convertVal v : convertVals xs
