@@ -124,6 +124,7 @@ data TdsValue = TdsNull
               | TdsDateTime2 Int32 Rational
               | TdsDateTimeOffset Int32 Rational Int16
               | TdsVarBinary BS.ByteString
+              | TdsBinary BS.ByteString
      deriving(Eq, Show)
 
 data Collation = Collation Int Int
@@ -633,6 +634,13 @@ parseRowCol (ColMetaData _ _ ti _) = do
                 else do
                     bs <- LG.getByteString (fromIntegral size)
                     return $ TdsVarBinary bs
+        TypeBinary size -> do
+            size <- LG.getWord16le
+            if size == 0xffff
+                then return TdsNull
+                else do
+                    bs <- LG.getByteString (fromIntegral size)
+                    return $ TdsBinary bs
 
 
 getTime :: Int -> Int -> LG.Get Rational

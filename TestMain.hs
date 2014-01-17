@@ -187,6 +187,8 @@ test_types = do
                                           (minutesToTimeZone (-5 * 60 - 30)))),
                  ("0x123456", "varbinary(3)",
                   SqlByteString (BS.pack [0x12,0x34,0x56])),
+                 ("0x123456", "binary(3)",
+                  SqlByteString (BS.pack [0x12,0x34,0x56])),
                  ("'1.5'", "decimal(10,1)", SqlRational 1.5),
                  ("'1.1234'", "decimal(10,4)", SqlRational 1.1234),
                  ("'-100'", "decimal(38)", SqlRational (-100)),
