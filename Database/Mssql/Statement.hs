@@ -1,7 +1,9 @@
 module Database.Mssql.Statement where
 import Database.Mssql.Tds
+import Database.Mssql.Collation
 
 import Control.Concurrent.MVar
+import qualified Data.Encoding as E
 import Data.Ratio
 import Data.Time.Calendar
 import Data.Time.Clock
@@ -95,6 +97,7 @@ convertVal (TdsDateTimeOffset days secs offset) = res
 
 convertVal (TdsVarBinary bs) = SqlByteString bs
 convertVal (TdsBinary bs) = SqlByteString bs
+convertVal (TdsChar collation bs) = SqlString $ E.decodeStrictByteString (getCharSet collation) bs
 
 convertVals :: [TdsValue] -> [SqlValue]
 convertVals [] = []

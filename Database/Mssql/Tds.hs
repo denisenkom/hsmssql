@@ -1,6 +1,7 @@
 --module Main where
 module Database.Mssql.Tds where
 
+import Database.Mssql.Collation
 import Database.HDBC
 import Database.HDBC.Types
 import qualified Network.Socket as Sock
@@ -125,10 +126,9 @@ data TdsValue = TdsNull
               | TdsDateTimeOffset Int32 Rational Int16
               | TdsVarBinary BS.ByteString
               | TdsBinary BS.ByteString
+              | TdsChar Collation BS.ByteString
      deriving(Eq, Show)
 
-data Collation = Collation Int Int
-     deriving(Eq, Show)
 
 
 parseInstancesImpl :: Get ([String])
@@ -514,12 +514,6 @@ parseTypeInfo = do
             return TypeXml
         otherwise -> fail ("unknown typeid: " ++ (show typeid))
 
-getCollation :: LG.Get Collation
-getCollation = do
-    lcidandflags <- LG.getWord32le
-    sordid <- LG.getWord8
-    return $ Collation (fromIntegral lcidandflags) (fromIntegral sordid)
-
 parseRowCol :: ColMetaData -> LG.Get TdsValue
 parseRowCol (ColMetaData _ _ ti _) = do
     case ti of
@@ -641,6 +635,14 @@ parseRowCol (ColMetaData _ _ ti _) = do
                 else do
                     bs <- LG.getByteString (fromIntegral size)
                     return $ TdsBinary bs
+        TypeChar _ collation -> do
+            size <- LG.getWord16le
+            if size == 0xffff
+                then return TdsNull
+                else do
+                    bs <- LG.getByteString (fromIntegral size)
+                    return $ TdsChar collation bs
+
 
 
 getTime :: Int -> Int -> LG.Get Rational
