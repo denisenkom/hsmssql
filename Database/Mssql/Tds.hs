@@ -538,9 +538,7 @@ parseRowCol (ColMetaData _ _ ti _) = do
                 2 -> do
                     val <- LG.getWord16le
                     return $ TdsInt2 (fromIntegral val)
-                4 -> do
-                    val <- LG.getWord32le
-                    return $ TdsInt4 (fromIntegral val)
+                4 -> getInt4
                 8 -> do
                     val <- LG.getWord64le
                     return $ TdsInt8 (fromIntegral val)
