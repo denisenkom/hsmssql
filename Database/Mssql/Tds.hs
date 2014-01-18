@@ -129,6 +129,7 @@ data TdsValue = TdsNull
               | TdsChar Collation BS.ByteString
               | TdsVarChar Collation BS.ByteString
               | TdsNChar Collation BS.ByteString
+              | TdsNVarChar Collation BS.ByteString
      deriving(Eq, Show)
 
 
@@ -658,7 +659,13 @@ parseRowCol (ColMetaData _ _ ti _) = do
                 else do
                     bs <- LG.getByteString (fromIntegral size)
                     return $ TdsNChar collation bs
-
+        TypeNVarChar _ collation -> do
+            size <- LG.getWord16le
+            if size == 0xffff
+                then return TdsNull
+                else do
+                    bs <- LG.getByteString (fromIntegral size)
+                    return $ TdsNVarChar collation bs
 
 
 getTime :: Int -> Int -> LG.Get Rational
