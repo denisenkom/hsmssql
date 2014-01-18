@@ -582,13 +582,8 @@ parseRowCol (ColMetaData _ _ ti _) = do
             size <- LG.getWord8
             case size of
                 0 -> return TdsNull
-                4 -> do
-                    val <- LG.getWord32le
-                    return $ TdsSmallMoney (fromIntegral val)
-                8 -> do
-                    hi <- LG.getWord32le
-                    lo <- LG.getWord32le
-                    return $ TdsMoney (((fromIntegral hi) `shiftL` 32) + (fromIntegral lo))
+                4 -> getSmallMoney
+                8 -> getMoney
         TypeDateTimeN _ -> do
             size <- LG.getWord8
             case size of
@@ -725,8 +720,18 @@ parseRowCol (ColMetaData _ _ ti _) = do
                         0x32 -> getBit
                         0x34 -> getInt2
                         0x38 -> getInt4
+                        0x3C -> getMoney
+                        0x7a -> getSmallMoney
                         0x7f -> getInt8
 
+getSmallMoney = do
+    val <- LG.getWord32le
+    return $ TdsSmallMoney (fromIntegral val)
+
+getMoney = do
+    hi <- LG.getWord32le
+    lo <- LG.getWord32le
+    return $ TdsMoney (((fromIntegral hi) `shiftL` 32) + (fromIntegral lo))
 
 getInt1 = do
     val <- LG.getWord8

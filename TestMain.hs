@@ -223,6 +223,8 @@ test_types = do
                  ("cast(5 as tinyint)", "sql_variant", SqlInt32 5),
                  ("cast(6 as smallint)", "sql_variant", SqlInt32 6),
                  ("cast(7 as bigint)", "sql_variant", SqlInt64 7),
+                 ("cast(100 as money)", "sql_variant", SqlRational 100),
+                 ("cast(100 as smallmoney)", "sql_variant", SqlRational 100),
                  ("'1.5'", "decimal(10,1)", SqlRational 1.5),
                  ("'1.1234'", "decimal(10,4)", SqlRational 1.1234),
                  ("'-100'", "decimal(38)", SqlRational (-100)),
