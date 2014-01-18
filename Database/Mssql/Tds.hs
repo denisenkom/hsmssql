@@ -187,15 +187,19 @@ packSQLBatch = 1
 packLogin7 = 16
 packPrelogin = 18
 
-serializePacket :: Word8 -> B.ByteString -> Put
-serializePacket packettype packet = do
+serializePacket :: Word8 -> B.ByteString -> Int -> Put
+serializePacket packettype packet bufSize = do
+    let (chunk, rem) = B.splitAt (fromIntegral (bufSize - 8)) packet
     putWord8 packettype
-    putWord8 1  -- final packet
-    putWord16be $ 8 + fromIntegral (B.length packet)
+    putWord8 (if rem == B.empty then 1 else 0)  -- final packet
+    putWord16be $ 8 + fromIntegral (B.length chunk)
     putWord16be 0 -- spid
     putWord8 0 -- packet no
     putWord8 0 -- padding
-    putLazyByteString packet
+    putLazyByteString chunk
+    if rem /= B.empty
+        then serializePacket packettype rem bufSize
+        else return ()
     flush
 
 preparePreLoginImpl :: Int -> [(Word8, B.ByteString)] -> [(Word8, B.ByteString, Int)]
@@ -226,33 +230,42 @@ serializePreLogin fields = do
     return ()
 
 
-sendPreLogin :: Handle -> Map.Map Word8 B.ByteString -> IO ()
-sendPreLogin s prelogin =
+sendPreLogin :: Handle -> Map.Map Word8 B.ByteString -> Int -> IO ()
+sendPreLogin s prelogin bufSize =
     do let preloginbuf = runPut $ serializePreLogin prelogin
-       B.hPutStr s $ runPut $ serializePacket packPrelogin preloginbuf
+       B.hPutStr s $ runPut $ serializePacket packPrelogin preloginbuf bufSize
 
 
 recvPreLogin :: Handle -> IO (Seq.Seq (Word8, Word16, Word16))
 recvPreLogin s =
-    do (packettype, _, preloginresppacket) <- getPacket s
+    do (packettype, preloginresppacket) <- getPacket s
        return $ LG.runGet getPreLoginHead preloginresppacket
 
 
-getPacket :: Handle -> IO (Word8, Bool, B.ByteString)
+getPacket :: Handle -> IO (Word8, B.ByteString)
 getPacket s = do
     let decode = do
-            packtype <- LG.getWord8
-            isfinal <- LG.getWord8
-            size <- LG.getWord16be
-            LG.getWord16be  -- spid
-            LG.getWord8  -- packet no
-            LG.getWord8  -- padding
+            packtype <- getWord8
+            isfinal <- getWord8
+            size <- getWord16be
+            getWord16be  -- spid
+            getWord8  -- packet no
+            getWord8  -- padding
             return (packtype, isfinal /= 0, size)
-
-    hdrbuf <- B.hGet s 8
-    let (packtype, isfinal, size) = LG.runGet decode hdrbuf
-    content <- B.hGet s ((fromIntegral size) - 8)
-    return (packtype, isfinal, content)
+        getStm = do
+            hdrbuf <- BS.hGet s 8
+            let (res, _) = runGet decode hdrbuf
+            case res of
+                Right (packtype, isfinal, size) -> do
+                    content <- BS.hGet s ((fromIntegral size) - 8)
+                    if isfinal
+                        then return (packtype, [content])
+                        else do
+                            (_, tailChunks) <- getStm
+                            return $ (packtype, content:tailChunks)
+                Left err -> fail err
+    (packtype, chunks) <- getStm
+    return (packtype, B.fromChunks chunks)
 
 getPreLoginHeadImpl :: Seq.Seq (Word8, Word16, Word16) -> LG.Get (Seq.Seq (Word8, Word16, Word16))
 getPreLoginHeadImpl fields = do
@@ -379,14 +392,14 @@ sendLogin :: Handle -> (Word32, Word32, Word32, Word32, Word32,
                   Word32, String, String, String, String,
                   String, B.ByteString, String, String, String,
                   MacAddress, B.ByteString, String,
-                  String) -> IO ()
-sendLogin s login =
+                  String) -> Int -> IO ()
+sendLogin s login bufSize =
     do let loginbuf = runPut $ serializeLogin login
-       B.hPutStr s $ runPut (serializePacket packLogin7 loginbuf)
+       B.hPutStr s $ runPut (serializePacket packLogin7 loginbuf bufSize)
 
 
 recvTokens s =
-    do (loginresptype, _, loginrespbuf) <- getPacket s
+    do (loginresptype, loginrespbuf) <- getPacket s
        let tokens = LG.runGet parseTokens loginrespbuf
            errors = filter isTokError tokens
        return tokens
@@ -944,20 +957,20 @@ putDataStmHeaders headers = do
 
 
 
-sendSqlBatch72 :: Handle -> [DataStmHeader] -> String -> IO ()
-sendSqlBatch72 s headers query = do
+sendSqlBatch72 :: Handle -> [DataStmHeader] -> String -> Int -> IO ()
+sendSqlBatch72 s headers query bufSize = do
     let putContent = do
             putDataStmHeaders headers
             putLazyByteString $ encodeUcs2 query
         packetbuf = runPut putContent
-    B.hPutStr s $ runPut $ serializePacket packSQLBatch packetbuf
+    B.hPutStr s $ runPut $ serializePacket packSQLBatch packetbuf bufSize
 
 
-exec :: Handle -> String -> IO [Token]
-exec s query = do
+exec :: Handle -> String -> Int -> IO [Token]
+exec s query bufSize = do
     let headers = [DataStmTransDescrHdr 0 1]
-    sendSqlBatch72 s headers query
-    (resptype, _, respbuf) <- getPacket s
+    sendSqlBatch72 s headers query bufSize
+    (resptype, respbuf) <- getPacket s
     let tokens = LG.runGet parseTokens respbuf
         errors = filter isTokError tokens
     return tokens

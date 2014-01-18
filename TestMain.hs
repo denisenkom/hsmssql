@@ -40,6 +40,14 @@ test_parseInstances =
     in
         assertEqual (Right ref) decoded
 
+test_serializePacket =
+    let buf = runPut $ serializePacket 1 (B.replicate 10 10) 16
+        ref = B.pack [1, 0, 0, 16, 0, 0, 0, 0, 10, 10, 10, 10, 10, 10, 10, 10,
+                      1, 1, 0, 10, 0, 0, 0, 0, 10, 10]
+    in
+        assertEqual ref buf
+
+
 test_sendLogin =
     let login = (verTDS74,
                  0x1000,
@@ -66,7 +74,7 @@ test_sendLogin =
                  "filepath",
                  "")
         loginbuf = runPut $ serializeLogin login
-        packet = runPut $ serializePacket packLogin7 loginbuf
+        packet = runPut $ serializePacket packLogin7 loginbuf 4096
         ref = [
             16, 1, 0, 222, 0, 0, 0, 0, 198+16, 0, 0, 0, 4, 0, 0, 116, 0, 16, 0, 0, 0, 1,
             6, 1, 100, 0, 0, 0, 0, 0, 0, 0, 224, 0, 0, 8, 16, 255, 255, 255, 4, 2, 0,
@@ -120,6 +128,14 @@ test_statement = do
     assertEqual ["fld1", "fld2"] names
     rows <- fetchAllRows stm
     assertEqual [[SqlInt32 1, SqlInt32 2]] rows
+
+test_bigRequest = do
+    conn <- connect
+    let val = (replicate 4000 'x')
+    stm <- prepare conn ("select len('" ++ val ++ "')")
+    executeRaw stm
+    rows <- fetchAllRows stm
+    assertEqual [[SqlInt32 (fromIntegral (length val))]] rows
 
 test_types = do
     conn <- connect
@@ -206,7 +222,7 @@ test_types = do
                  ("cast(1 as bit)", "sql_variant", SqlBool True),
                  ("cast(5 as tinyint)", "sql_variant", SqlInt32 5),
                  ("cast(6 as smallint)", "sql_variant", SqlInt32 6),
-                 --("cast(7 as bigint)", "sql_variant", SqlInt64 7),
+                 ("cast(7 as bigint)", "sql_variant", SqlInt64 7),
                  ("'1.5'", "decimal(10,1)", SqlRational 1.5),
                  ("'1.1234'", "decimal(10,4)", SqlRational 1.1234),
                  ("'-100'", "decimal(38)", SqlRational (-100)),

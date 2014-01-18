@@ -20,17 +20,19 @@ data SState =
              squery :: String,
              coldefmv :: MVar [(String, SqlColDesc)],
              tokenstm :: MVar [Token],
-             metadatatok :: MVar Token}
+             metadatatok :: MVar Token,
+             bufSize :: Int}
 
-newSth :: Handle -> String -> IO Statement
-newSth conn query =
+newSth :: Handle -> Int -> String -> IO Statement
+newSth conn bufSize query =
     do newcoldefmv <- newMVar []
        tokenstm <- newMVar []
        metadatatok <- newMVar TokColMetaDataEmpty
        let sstate = SState {conn = conn, squery = query,
                             coldefmv = newcoldefmv,
                             tokenstm = tokenstm,
-                            metadatatok = metadatatok}
+                            metadatatok = metadatatok,
+                            bufSize = bufSize}
            retval = Statement {executeRaw = fexecuteRaw sstate,
                                getColumnNames = fgetColumnNames sstate,
                                fetchRow = ffetchRow sstate}
@@ -39,7 +41,7 @@ newSth conn query =
 
 fexecuteRaw :: SState -> IO ()
 fexecuteRaw sstate =
-    do tokens <- exec (conn sstate) (squery sstate)
+    do tokens <- exec (conn sstate) (squery sstate) (bufSize sstate)
        let metadatas = filter isTokMetaData tokens
            metadata = head metadatas
            metadataCols (TokColMetaData cols _) = cols
