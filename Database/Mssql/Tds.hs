@@ -453,7 +453,9 @@ parseTypeInfo = do
         0x3c -> return TypeMoney
         0x3d -> return TypeDateTime
         0x3e -> return TypeFlt8
-        0x62 -> fail("variant type not implemented")
+        0x62 -> do
+            size <- LG.getWord32le
+            return $ TypeVariant (fromIntegral size)
         0x63 -> do
             size <- LG.getWord32le
             col <- getCollation
@@ -524,9 +526,7 @@ parseTypeInfo = do
 parseRowCol :: ColMetaData -> LG.Get TdsValue
 parseRowCol (ColMetaData _ _ ti _) = do
     case ti of
-        TypeInt4 -> do
-            val <- LG.getWord32le
-            return $ TdsInt4 (fromIntegral val)
+        TypeInt4 -> getInt4
         TypeGuid _ -> do
             size <- LG.getWord8
             bs <- LG.getByteString (fromIntegral size)
@@ -707,6 +707,19 @@ parseRowCol (ColMetaData _ _ ti _) = do
                     colSize <- LG.getWord32le
                     bs <- LG.getLazyByteString (fromIntegral colSize)
                     return $ TdsImage bs
+        TypeVariant _ -> do
+            size <- LG.getWord32le
+            if size == 0
+                then return TdsNull
+                else do
+                    typeId <- LG.getWord8
+                    propBytes <- LG.getWord8
+                    case typeId of
+                        0x38 -> getInt4
+
+getInt4 = do
+    val <- LG.getWord32le
+    return $ TdsInt4 (fromIntegral val)
 
 
 getPlp :: LG.Get B.ByteString
