@@ -562,12 +562,8 @@ parseRowCol (ColMetaData _ _ ti _) = do
             size <- LG.getWord8
             case size of
                 0 -> return TdsNull
-                4 -> do
-                    val <- getFloat32le
-                    return $ TdsReal val
-                8 -> do
-                    val <- getFloat64le
-                    return $ TdsFloat val
+                4 -> getFlt4
+                8 -> getFlt8
         TypeDecimalN prec scale -> do
             size <- LG.getWord8
             case size of
@@ -717,8 +713,18 @@ parseRowCol (ColMetaData _ _ ti _) = do
                         0x3C -> getMoney
                         0x3D -> getDateTime
                         0x3A -> getSmallDateTime
+                        0x3b -> getFlt4
+                        0x3e -> getFlt8
                         0x7a -> getSmallMoney
                         0x7f -> getInt8
+
+getFlt4 = do
+    val <- getFloat32le
+    return $ TdsReal val
+
+getFlt8 = do
+    val <- getFloat64le
+    return $ TdsFloat val
 
 getSmallDateTime = do
     days <- LG.getWord16le

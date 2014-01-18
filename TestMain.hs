@@ -231,6 +231,8 @@ test_types = do
                  ("cast('2010-01-02T03:04:00' as smalldatetime)", "sql_variant",
                   SqlLocalTime (LocalTime (fromGregorian 2010 1 2)
                                           (TimeOfDay 3 4 0))),
+                 ("cast(1.5 as float)", "sql_variant", SqlDouble 1.5),
+                 ("cast(1.5 as real)", "sql_variant", SqlDouble 1.5),
                  ("'1.5'", "decimal(10,1)", SqlRational 1.5),
                  ("'1.1234'", "decimal(10,4)", SqlRational 1.1234),
                  ("'-100'", "decimal(38)", SqlRational (-100)),
