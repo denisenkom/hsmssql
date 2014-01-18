@@ -98,6 +98,7 @@ convertVal (TdsDateTimeOffset days secs offset) = res
 convertVal (TdsVarBinary bs) = SqlByteString bs
 convertVal (TdsBinary bs) = SqlByteString bs
 convertVal (TdsChar collation bs) = SqlString $ E.decodeStrictByteString (getCharSet collation) bs
+convertVal (TdsVarChar collation bs) = SqlString $ E.decodeStrictByteString (getCharSet collation) bs
 
 convertVals :: [TdsValue] -> [SqlValue]
 convertVals [] = []
