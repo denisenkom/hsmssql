@@ -103,6 +103,8 @@ convertVal (TdsVarChar collation bs) = SqlString $ E.decodeStrictByteString (get
 convertVal (TdsNChar collation bs) = SqlString $ E.decodeStrictByteString UTF16LE bs
 convertVal (TdsNVarChar collation bs) = SqlString $ E.decodeStrictByteString UTF16LE bs
 convertVal (TdsXml bs) = SqlString $ E.decodeLazyByteString UTF16LE bs
+convertVal (TdsText collation bs) = SqlString $ E.decodeLazyByteString (getCharSet collation) bs
+convertVal (TdsNText collation bs) = SqlString $ E.decodeLazyByteString UTF16LE bs
 
 convertVals :: [TdsValue] -> [SqlValue]
 convertVals [] = []

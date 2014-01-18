@@ -131,6 +131,8 @@ data TdsValue = TdsNull
               | TdsNChar Collation BS.ByteString
               | TdsNVarChar Collation BS.ByteString
               | TdsXml B.ByteString
+              | TdsText Collation B.ByteString
+              | TdsNText Collation B.ByteString
      deriving(Eq, Show)
 
 
@@ -674,6 +676,27 @@ parseRowCol (ColMetaData _ _ ti _) = do
                 otherwise -> do
                     bs <- getPlp
                     return $ TdsXml bs
+        TypeText _ collation -> do
+            size <- LG.getWord8
+            if size == 0
+                then return TdsNull
+                else do
+                    LG.getByteString (fromIntegral size)  -- textptr
+                    LG.getByteString 8  -- timestamp
+                    colSize <- LG.getWord32le
+                    bs <- LG.getLazyByteString (fromIntegral colSize)
+                    return $ TdsText collation bs
+        TypeNText _ collation -> do
+            size <- LG.getWord8
+            if size == 0
+                then return TdsNull
+                else do
+                    LG.getByteString (fromIntegral size)  -- textptr
+                    LG.getByteString 8  -- timestamp
+                    colSize <- LG.getWord32le
+                    bs <- LG.getLazyByteString (fromIntegral colSize)
+                    return $ TdsNText collation bs
+
 
 getPlp :: LG.Get B.ByteString
 getPlp = getChunks
