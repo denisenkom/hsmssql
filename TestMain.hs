@@ -202,6 +202,7 @@ test_types = do
                  ("1", "sql_variant", SqlInt32 1),
                  ("cast('0E984725-C51C-4BF4-9960-E1C80E27ABA0' as uniqueidentifier)",
                   "sql_variant", SqlByteString (BS.pack [0x25,0x47,0x98,0x0E, 0x1C,0xC5,0xF4,0x4B, 0x99,0x60,0xE1,0xC8,0x0E,0x27,0xAB,0xA0])),
+                 ("cast(1 as bit)", "sql_variant", SqlBool True),
                  ("'1.5'", "decimal(10,1)", SqlRational 1.5),
                  ("'1.1234'", "decimal(10,4)", SqlRational 1.1234),
                  ("'-100'", "decimal(38)", SqlRational (-100)),

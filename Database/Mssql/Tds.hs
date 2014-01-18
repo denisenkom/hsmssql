@@ -550,9 +550,7 @@ parseRowCol (ColMetaData _ _ ti _) = do
             size <- LG.getWord8
             case size of
                 0 -> return TdsNull
-                1 -> do
-                    val <- LG.getWord8
-                    return $ TdsBool (if val == 0 then False else True)
+                1 -> getBit
         TypeFltN _ -> do
             size <- LG.getWord8
             case size of
@@ -716,7 +714,13 @@ parseRowCol (ColMetaData _ _ ti _) = do
                     let dataSize = (fromIntegral size) - (fromIntegral propBytes) - 2
                     case typeId of
                         0x24 -> getGuid dataSize
+                        0x32 -> getBit
                         0x38 -> getInt4
+
+
+getBit = do
+    val <- LG.getWord8
+    return $ TdsBool (if val == 0 then False else True)
 
 
 getGuid size = do
