@@ -3,6 +3,7 @@ import Database.Mssql.Tds
 import Database.Mssql.Collation
 
 import Control.Concurrent.MVar
+import qualified Data.ByteString.Lazy as B
 import qualified Data.Encoding as E
 import Data.Encoding.UTF16
 import Data.Ratio
@@ -105,6 +106,7 @@ convertVal (TdsNVarChar collation bs) = SqlString $ E.decodeStrictByteString UTF
 convertVal (TdsXml bs) = SqlString $ E.decodeLazyByteString UTF16LE bs
 convertVal (TdsText collation bs) = SqlString $ E.decodeLazyByteString (getCharSet collation) bs
 convertVal (TdsNText collation bs) = SqlString $ E.decodeLazyByteString UTF16LE bs
+convertVal (TdsImage bs) = SqlByteString $ B.toStrict bs
 
 convertVals :: [TdsValue] -> [SqlValue]
 convertVals [] = []

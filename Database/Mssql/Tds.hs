@@ -133,6 +133,7 @@ data TdsValue = TdsNull
               | TdsXml B.ByteString
               | TdsText Collation B.ByteString
               | TdsNText Collation B.ByteString
+              | TdsImage B.ByteString
      deriving(Eq, Show)
 
 
@@ -696,6 +697,16 @@ parseRowCol (ColMetaData _ _ ti _) = do
                     colSize <- LG.getWord32le
                     bs <- LG.getLazyByteString (fromIntegral colSize)
                     return $ TdsNText collation bs
+        TypeImage _ -> do
+            size <- LG.getWord8
+            if size == 0
+                then return TdsNull
+                else do
+                    LG.getByteString (fromIntegral size)  -- textptr
+                    LG.getByteString 8  -- timestamp
+                    colSize <- LG.getWord32le
+                    bs <- LG.getLazyByteString (fromIntegral colSize)
+                    return $ TdsImage bs
 
 
 getPlp :: LG.Get B.ByteString
