@@ -130,6 +130,7 @@ data TdsValue = TdsNull
               | TdsVarChar Collation BS.ByteString
               | TdsNChar Collation BS.ByteString
               | TdsNVarChar Collation BS.ByteString
+              | TdsXml B.ByteString
      deriving(Eq, Show)
 
 
@@ -666,6 +667,24 @@ parseRowCol (ColMetaData _ _ ti _) = do
                 else do
                     bs <- LG.getByteString (fromIntegral size)
                     return $ TdsNVarChar collation bs
+        TypeXml -> do
+            size <- LG.getWord64le
+            case size of
+                0xffffffffffffffff -> return TdsNull
+                otherwise -> do
+                    bs <- getPlp
+                    return $ TdsXml bs
+
+getPlp :: LG.Get B.ByteString
+getPlp = getChunks
+    where getChunks = do
+            chunkSize <- LG.getWord32le
+            if chunkSize == 0
+                then return B.empty
+                else do
+                    chunk <- LG.getLazyByteString (fromIntegral chunkSize)
+                    tailChunks <- getChunks
+                    return $ B.append chunk tailChunks
 
 
 getTime :: Int -> Int -> LG.Get Rational

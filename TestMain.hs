@@ -194,6 +194,7 @@ test_types = do
                  ("'abcd'", "varchar(4)", SqlString "abcd"),
                  ("N'abcd'", "nchar(4)", SqlString "abcd"),
                  ("N'abcd'", "nvarchar(4)", SqlString "abcd"),
+                 ("'<root/>'", "xml", SqlString "<root/>"),
                  ("'1.5'", "decimal(10,1)", SqlRational 1.5),
                  ("'1.1234'", "decimal(10,4)", SqlRational 1.1234),
                  ("'-100'", "decimal(38)", SqlRational (-100)),
