@@ -588,14 +588,8 @@ parseRowCol (ColMetaData _ _ ti _) = do
             size <- LG.getWord8
             case size of
                 0 -> return TdsNull
-                4 -> do
-                    days <- LG.getWord16le
-                    minutes <- LG.getWord16le
-                    return $ TdsSmallDateTime days minutes
-                8 -> do
-                    days <- LG.getWord32le
-                    timefrac <- LG.getWord32le
-                    return $ TdsDateTime (fromIntegral days) timefrac
+                4 -> getSmallDateTime
+                8 -> getDateTime
         TypeDateN -> do
             size <- LG.getWord8
             case size of
@@ -721,8 +715,20 @@ parseRowCol (ColMetaData _ _ ti _) = do
                         0x34 -> getInt2
                         0x38 -> getInt4
                         0x3C -> getMoney
+                        0x3D -> getDateTime
+                        0x3A -> getSmallDateTime
                         0x7a -> getSmallMoney
                         0x7f -> getInt8
+
+getSmallDateTime = do
+    days <- LG.getWord16le
+    minutes <- LG.getWord16le
+    return $ TdsSmallDateTime days minutes
+
+getDateTime = do
+    days <- LG.getWord32le
+    timefrac <- LG.getWord32le
+    return $ TdsDateTime (fromIntegral days) timefrac
 
 getSmallMoney = do
     val <- LG.getWord32le
