@@ -590,33 +590,23 @@ parseRowCol (ColMetaData _ _ ti _) = do
             size <- LG.getWord8
             case size of
                 0 -> return TdsNull
-                3 -> do
-                    days <- getDate
-                    return $ TdsDate days
+                3 -> getDate
+                    
         TypeTimeN scale -> do
             size <- LG.getWord8
             case size of
                 0 -> return TdsNull
-                otherwise -> do
-                    secs <- getTime (fromIntegral scale) (fromIntegral size)
-                    return $ TdsTime secs
+                otherwise -> getTime (fromIntegral scale) (fromIntegral size)
         TypeDateTime2N scale -> do
             size <- LG.getWord8
             case size of
                 0 -> return TdsNull
-                otherwise -> do
-                    secs <- getTime (fromIntegral scale) ((fromIntegral size) - 3)
-                    days <- getDate
-                    return $ TdsDateTime2 days secs
+                otherwise -> getDateTime2 (fromIntegral scale) (fromIntegral size)
         TypeDateTimeOffsetN scale -> do
             size <- LG.getWord8
             case size of
                 0 -> return TdsNull
-                otherwise -> do
-                    secs <- getTime (fromIntegral scale) ((fromIntegral size) - 5)
-                    days <- getDate
-                    offset <- LG.getWord16le
-                    return $ TdsDateTimeOffset days secs (fromIntegral offset)
+                otherwise -> getDateTimeOffset (fromIntegral scale) (fromIntegral size)
         TypeVarBinary size -> do
             size <- LG.getWord16le
             if size == 0xffff
@@ -706,6 +696,16 @@ parseRowCol (ColMetaData _ _ ti _) = do
                     let dataSize = (fromIntegral size) - (fromIntegral propBytes) - 2
                     case typeId of
                         0x24 -> getGuid dataSize
+                        0x28 -> getDate
+                        0x29 -> do
+                            scale <- LG.getWord8
+                            getTime (fromIntegral scale) dataSize
+                        0x2a -> do
+                            scale <- LG.getWord8
+                            getDateTime2 (fromIntegral scale) dataSize
+                        0x2b -> do
+                            scale <- LG.getWord8
+                            getDateTimeOffset (fromIntegral scale) dataSize
                         0x30 -> getInt1
                         0x32 -> getBit
                         0x34 -> getInt2
@@ -786,15 +786,36 @@ getPlp = getChunks
                     tailChunks <- getChunks
                     return $ B.append chunk tailChunks
 
+getDateTimeOffset :: Int -> Int -> LG.Get TdsValue
+getDateTimeOffset scale size = do
+    secs <- getTimeSecs (fromIntegral scale) ((fromIntegral size) - 5)
+    days <- getDateDays
+    offset <- LG.getWord16le
+    return $ TdsDateTimeOffset days secs (fromIntegral offset)
 
-getTime :: Int -> Int -> LG.Get Rational
+getDateTime2 :: Int -> Int -> LG.Get TdsValue
+getDateTime2 scale size = do
+    secs <- getTimeSecs (fromIntegral scale) ((fromIntegral size) - 3)
+    days <- getDateDays
+    return $ TdsDateTime2 days secs
+
+getTime :: Int -> Int -> LG.Get TdsValue
 getTime scale size = do
+    secs <- getTimeSecs (fromIntegral scale) (fromIntegral size)
+    return $ TdsTime secs
+
+getTimeSecs :: Int -> Int -> LG.Get Rational
+getTimeSecs scale size = do
     ints <- replicateM size LG.getWord8
     let time = foldr (\v acc -> (fromIntegral v) + (acc `shiftL` 8)) (0 :: Word64) ints
     return $ (fromIntegral time) % (10 ^ scale)
 
-getDate :: LG.Get Int32
 getDate = do
+    days <- getDateDays
+    return $ TdsDate days
+
+getDateDays :: LG.Get Int32
+getDateDays = do
     b1 <- LG.getWord8
     b2 <- LG.getWord8
     b3 <- LG.getWord8

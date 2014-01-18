@@ -233,6 +233,18 @@ test_types = do
                                           (TimeOfDay 3 4 0))),
                  ("cast(1.5 as float)", "sql_variant", SqlDouble 1.5),
                  ("cast(1.5 as real)", "sql_variant", SqlDouble 1.5),
+                 ("cast('2014-01-01' as date)", "sql_variant",
+                  SqlLocalDate $ fromGregorian 2014 1 1),
+                 ("cast('01:02:03.4567891' as time(7))", "sql_variant",
+                  SqlLocalTimeOfDay (TimeOfDay 1 2 3.4567891)),
+                 ("cast('2010-01-02T03:04:05.010' as datetime2)", "sql_variant",
+                  SqlLocalTime (LocalTime (fromGregorian 2010 1 2)
+                                          (TimeOfDay 3 4 5.01))),
+                 ("cast('2010-01-02T03:04:05.010+05:30' as datetimeoffset)",
+                  "sql_variant",
+                  SqlZonedTime (ZonedTime (LocalTime (fromGregorian 2010 1 2)
+                                          (TimeOfDay 3 4 5.01))
+                                          (minutesToTimeZone (5 * 60 + 30)))),
                  ("'1.5'", "decimal(10,1)", SqlRational 1.5),
                  ("'1.1234'", "decimal(10,4)", SqlRational 1.1234),
                  ("'-100'", "decimal(38)", SqlRational (-100)),
