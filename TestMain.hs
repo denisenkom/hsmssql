@@ -197,10 +197,9 @@ test_types = do
                  ("'" ++ (show (10 ^ 38 - 1)) ++ "'", "decimal(38)", SqlRational (10 ^ 38 - 1)),
                  ("'" ++ (show (-10 ^ 38 + 1)) ++ "'", "decimal(38)", SqlRational (-10 ^ 38 + 1)),
                  ("'1.1234'", "numeric(10,4)", SqlRational 1.1234)]
-        makeQuery tests =
-            "select " ++ (join "," [("cast(" ++ sql ++ " as " ++ sqltype ++ ")") | (sql, sqltype, _) <- tests])
+        query = "select " ++ (join "," [("cast(" ++ sql ++ " as " ++ sqltype ++ ")") | (sql, sqltype, _) <- tests])
         values = [val | (_, _, val) <- tests]
-    stm <- prepare conn (makeQuery tests)
+    stm <- prepare conn query
     executeRaw stm
     rows <- fetchAllRows stm
     assertEqual [values] rows
