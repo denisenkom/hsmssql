@@ -529,19 +529,17 @@ parseRowCol (ColMetaData _ _ ti _) = do
         TypeInt4 -> getInt4
         TypeGuid _ -> do
             size <- LG.getWord8
-            getGuid $ fromIntegral size
+            if size == 0
+                then return TdsNull
+                else getGuid $ fromIntegral size
         TypeIntN _ -> do
             size <- LG.getWord8
             case size of
                 0 -> return TdsNull
                 1 -> getInt1
-                2 -> do
-                    val <- LG.getWord16le
-                    return $ TdsInt2 (fromIntegral val)
+                2 -> getInt2
                 4 -> getInt4
-                8 -> do
-                    val <- LG.getWord64le
-                    return $ TdsInt8 (fromIntegral val)
+                8 -> getInt8
         TypeBitN _ -> do
             size <- LG.getWord8
             case size of
@@ -712,12 +710,24 @@ parseRowCol (ColMetaData _ _ ti _) = do
                         0x24 -> getGuid dataSize
                         0x30 -> getInt1
                         0x32 -> getBit
+                        0x34 -> getInt2
                         0x38 -> getInt4
+                        0x7f -> getInt8
 
 
 getInt1 = do
     val <- LG.getWord8
     return $ TdsInt1 val
+
+
+getInt2 = do
+    val <- LG.getWord16le
+    return $ TdsInt2 (fromIntegral val)
+
+
+getInt8 = do
+    val <- LG.getWord64le
+    return $ TdsInt8 (fromIntegral val)
 
 
 getBit = do
