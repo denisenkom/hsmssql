@@ -13,6 +13,7 @@ import qualified Data.Map as M
 import Data.Char (ord)
 import Data.Maybe
 import Data.Ratio
+import Data.String.Utils
 import Data.Time.Calendar
 import Data.Time.LocalTime
 import System.Environment
@@ -196,15 +197,13 @@ test_types = do
                  ("'" ++ (show (10 ^ 38 - 1)) ++ "'", "decimal(38)", SqlRational (10 ^ 38 - 1)),
                  ("'" ++ (show (-10 ^ 38 + 1)) ++ "'", "decimal(38)", SqlRational (-10 ^ 38 + 1)),
                  ("'1.1234'", "numeric(10,4)", SqlRational 1.1234)]
-        runTests [] = return ()
-        runTests ((sql, sqltype, val):xs) = do
-            stm <- prepare conn ("select cast(" ++ sql ++ " as " ++ sqltype ++ ")")
-            executeRaw stm
-            rows <- fetchAllRows stm
-            assertEqual [[val]] rows
-            runTests xs
-
-    runTests tests
+        makeQuery tests =
+            "select " ++ (join "," [("cast(" ++ sql ++ " as " ++ sqltype ++ ")") | (sql, sqltype, _) <- tests])
+        values = [val | (_, _, val) <- tests]
+    stm <- prepare conn (makeQuery tests)
+    executeRaw stm
+    rows <- fetchAllRows stm
+    assertEqual [values] rows
 
 
 main = htfMain htf_thisModulesTests
