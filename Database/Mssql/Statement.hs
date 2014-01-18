@@ -4,6 +4,7 @@ import Database.Mssql.Collation
 
 import Control.Concurrent.MVar
 import qualified Data.Encoding as E
+import Data.Encoding.UTF16
 import Data.Ratio
 import Data.Time.Calendar
 import Data.Time.Clock
@@ -99,6 +100,7 @@ convertVal (TdsVarBinary bs) = SqlByteString bs
 convertVal (TdsBinary bs) = SqlByteString bs
 convertVal (TdsChar collation bs) = SqlString $ E.decodeStrictByteString (getCharSet collation) bs
 convertVal (TdsVarChar collation bs) = SqlString $ E.decodeStrictByteString (getCharSet collation) bs
+convertVal (TdsNChar collation bs) = SqlString $ E.decodeStrictByteString UTF16LE bs
 
 convertVals :: [TdsValue] -> [SqlValue]
 convertVals [] = []
