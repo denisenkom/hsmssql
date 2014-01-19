@@ -743,6 +743,17 @@ parseRowCol (ColMetaData _ _ ti _) = do
                             LG.getWord16le
                             bs <- LG.getByteString dataSize
                             return $ TdsChar collation bs
+                        0xe7 -> do
+                            collation <- getCollation
+                            LG.getWord16le
+                            bs <- LG.getByteString dataSize
+                            return $ TdsNVarChar collation bs
+                        0xef -> do
+                            collation <- getCollation
+                            LG.getWord16le
+                            bs <- LG.getByteString dataSize
+                            return $ TdsNChar collation bs
+
 
 getFlt4 = do
     val <- getFloat32le

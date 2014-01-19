@@ -253,6 +253,8 @@ test_types = do
                  ("cast('1.5' as numeric(10,1))", "sql_variant", SqlRational 1.5),
                  ("cast('abc' as char(3))", "sql_variant", SqlString "abc"),
                  ("cast('abcd' as varchar(4))", "sql_variant", SqlString "abcd"),
+                 ("cast(N'abc' as nchar(3))", "sql_variant", SqlString "abc"),
+                 ("cast(N'abcd' as nvarchar(4))", "sql_variant", SqlString "abcd"),
                  ("'1.5'", "decimal(10,1)", SqlRational 1.5),
                  ("'1.1234'", "decimal(10,4)", SqlRational 1.1234),
                  ("'-100'", "decimal(38)", SqlRational (-100)),
