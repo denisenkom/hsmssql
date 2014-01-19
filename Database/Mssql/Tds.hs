@@ -715,6 +715,14 @@ parseRowCol (ColMetaData _ _ ti _) = do
                         0x3A -> getSmallDateTime
                         0x3b -> getFlt4
                         0x3e -> getFlt8
+                        0x6a -> do
+                            prec <- LG.getWord8
+                            scale <- LG.getWord8
+                            getDecimal prec scale dataSize
+                        0x6c -> do
+                            prec <- LG.getWord8
+                            scale <- LG.getWord8
+                            getDecimal prec scale dataSize
                         0x7a -> getSmallMoney
                         0x7f -> getInt8
                         0xa5 -> do
