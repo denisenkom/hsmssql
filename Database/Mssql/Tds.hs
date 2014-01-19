@@ -717,6 +717,14 @@ parseRowCol (ColMetaData _ _ ti _) = do
                         0x3e -> getFlt8
                         0x7a -> getSmallMoney
                         0x7f -> getInt8
+                        0xa5 -> do
+                            LG.getWord16le
+                            bs <- LG.getByteString dataSize
+                            return $ TdsVarBinary bs
+                        0xad -> do
+                            LG.getWord16le
+                            bs <- LG.getByteString dataSize
+                            return $ TdsBinary bs
 
 getFlt4 = do
     val <- getFloat32le
