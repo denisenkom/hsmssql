@@ -46,6 +46,10 @@ newSth conn bufSize query =
 
 colDescFromTi :: TypeInfo -> SqlColDesc
 colDescFromTi TypeInt4 = SqlColDesc SqlIntegerT Nothing Nothing Nothing (Just False)
+colDescFromTi TypeFlt4 = SqlColDesc SqlFloatT Nothing Nothing Nothing (Just False)
+colDescFromTi TypeFlt8 = SqlColDesc SqlDoubleT Nothing Nothing Nothing (Just False)
+colDescFromTi (TypeFltN 4) = SqlColDesc SqlFloatT Nothing Nothing Nothing (Just True)
+colDescFromTi (TypeFltN 8) = SqlColDesc SqlDoubleT Nothing Nothing Nothing (Just True)
 
 processResp :: [Token] -> [Token] -> (Maybe Token, [Token], [Token], Bool)
 processResp (metadata@(TokColMetaData _ _):xs) errors =

@@ -284,5 +284,15 @@ test_types = do
     rows <- fetchAllRows stm
     assertEqual [values] rows
 
+test_describeResult = do
+    let tests = [("float", (SqlDoubleT, Nothing, Nothing, Nothing)),
+                 ("real", (SqlFloatT, Nothing, Nothing, Nothing))]
+        query = "select " ++ (join "," [("cast(null as " ++ sqltype ++ ")") | (sqltype, _) <- tests])
+        values = [("", SqlColDesc typ size octlen dec (Just True)) | (_, (typ, size, octlen, dec)) <- tests]
+    conn <- connect
+    stm <- prepare conn query
+    executeRaw stm
+    descr <- describeResult stm
+    assertEqual values descr
 
 main = htfMain htf_thisModulesTests
