@@ -63,10 +63,10 @@ frunRaw s bufSize query = do
             processResp xs ((num, state, cls, message, srvname, procname, lineno):messages)
         processResp ((TokInfo num state cls message srvname procname lineno):xs) messages =
             processResp xs ((num, state, cls, message, srvname, procname, lineno):messages)
-        processResp ((TokDone status _ _):xs) messages =
+        processResp (done@(TokDone status _ _):xs) messages =
             if (status .&. doneMoreResults == 0)
                 then if xs == []
-                    then (messages, status .&. (doneErrorFlag .|. doneSrvErrorFlag) == 0)
+                    then (messages, isDoneSuccess done)
                     else error "unexpected tokens after final DONE token"
                 else processResp xs messages
         processResp (_:xs) messages = processResp xs messages

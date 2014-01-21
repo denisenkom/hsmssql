@@ -3,6 +3,7 @@ import Database.Mssql.Tds
 import Database.Mssql.Collation
 
 import Control.Concurrent.MVar
+import Data.Bits
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Encoding as E
 import Data.Encoding.UTF16
@@ -38,20 +39,37 @@ newSth conn bufSize query =
                                fetchRow = ffetchRow sstate}
        return retval
 
+processResp :: [Token] -> [Token] -> (Maybe Token, [Token], [Token], Bool)
+processResp (metadata@(TokColMetaData _ _):xs) errors =
+    (Just metadata, xs, [], True)
+processResp (err@(TokError _ _ _ _ _ _ _):xs) errors =
+    processResp xs (err:errors)
+processResp (done@(TokDone status _ _):xs) errors =
+    if status .&. doneMoreResults == 0
+         then if xs == []
+             then (Nothing, [], errors, isDoneSuccess done)
+             else error "unexpected tokens after final DONE token"
+         else processResp xs []
 
 fexecuteRaw :: SState -> IO ()
 fexecuteRaw sstate =
     do tokens <- exec (conn sstate) (squery sstate) (bufSize sstate)
-       let metadatas = filter isTokMetaData tokens
-           metadata = head metadatas
-           metadataCols (TokColMetaData cols _) = cols
-           cols = metadataCols metadata
-           coldef (ColMetaData usertype flags ti name) =
-                (name, SqlColDesc SqlCharT Nothing Nothing Nothing Nothing)
-       swapMVar (coldefmv sstate) [coldef col | col <- cols]
-       swapMVar (tokenstm sstate) tokens
-       swapMVar (metadatatok sstate) metadata
-       return ()
+       let (mmetadata, remtokens, errors, status) = processResp tokens []
+       case mmetadata of
+           Just metadata -> do
+               let metadataCols (TokColMetaData cols _) = cols
+                   cols = metadataCols metadata
+                   coldef (ColMetaData usertype flags ti name) =
+                       (name, SqlColDesc SqlCharT Nothing Nothing Nothing Nothing)
+               swapMVar (coldefmv sstate) [coldef col | col <- cols]
+               swapMVar (tokenstm sstate) remtokens
+               swapMVar (metadatatok sstate) metadata
+               return ()
+           Nothing -> do
+               throwSqlError (if errors == []
+                   then SqlError {seState = "", seNativeError = -1, seErrorMsg = "Query failed, server didn't send an error"}
+                   else let (TokError errno _ _ msg _ _ _) = head errors
+                       in SqlError {seState = "", seNativeError = errno, seErrorMsg = msg})
 
 convertVal :: TdsValue -> SqlValue
 convertVal TdsNull = SqlNull

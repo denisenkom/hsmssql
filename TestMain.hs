@@ -145,6 +145,9 @@ test_error = do
                        seErrorMsg = "Incorrect syntax near the keyword 'where'."}
     assertRaises "" ex $ runRaw conn "select where from"
 
+    stm <- prepare conn "select where from"
+    assertRaises "" ex $ executeRaw stm
+
 test_types = do
     conn <- connect
     let tests = [("1.5", "float", SqlDouble 1.5),

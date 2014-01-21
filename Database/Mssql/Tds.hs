@@ -962,6 +962,8 @@ doneMoreResults = 0x1 :: Int
 doneErrorFlag = 0x2 :: Int
 doneSrvErrorFlag = 0x100 :: Int
 
+isDoneSuccess (TokDone status _ _) = status .&. (doneErrorFlag .|. doneSrvErrorFlag) == 0
+
 parseDone = do
     status <- LG.getWord16le
     curcmd <- LG.getWord16le
