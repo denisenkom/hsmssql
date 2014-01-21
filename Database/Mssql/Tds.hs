@@ -884,12 +884,25 @@ parseRowHelper (col:xs) = do
     vals <- parseRowHelper xs
     return $ val:vals
 
+
 parseRowM :: [ColMetaData] -> LG.Get (Maybe Token)
 parseRowM cols = do
     tok <- LG.getWord8
     case tok of
         209 -> do
             vals <- parseRowHelper cols
+            return $ Just (TokRow vals)
+        210 -> do
+            nulls <- LG.getByteString (((length cols) + 7) `quot` 8)
+            let parseNbcRow [] _ = return []
+                parseNbcRow (col:xs) idx = do
+                    let (byte, bit) = quotRem idx 8
+                    val <- (if testBit (BS.index nulls byte) bit
+                        then return TdsNull
+                        else parseRowCol col)
+                    vals <- parseNbcRow xs (idx + 1)
+                    return $ val:vals
+            vals <- parseNbcRow cols 0
             return $ Just (TokRow vals)
         otherwise -> return Nothing
 
