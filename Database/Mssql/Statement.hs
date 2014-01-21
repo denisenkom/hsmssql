@@ -50,6 +50,8 @@ colDescFromTi TypeFlt4 = SqlColDesc SqlFloatT Nothing Nothing Nothing (Just Fals
 colDescFromTi TypeFlt8 = SqlColDesc SqlDoubleT Nothing Nothing Nothing (Just False)
 colDescFromTi (TypeFltN 4) = SqlColDesc SqlFloatT Nothing Nothing Nothing (Just True)
 colDescFromTi (TypeFltN 8) = SqlColDesc SqlDoubleT Nothing Nothing Nothing (Just True)
+colDescFromTi (TypeDecimalN prec scale) = SqlColDesc SqlDecimalT (Just (fromIntegral prec)) Nothing (Just (fromIntegral scale)) (Just True)
+colDescFromTi (TypeNumericN prec scale) = SqlColDesc SqlDecimalT (Just (fromIntegral prec)) Nothing (Just (fromIntegral scale)) (Just True)
 
 processResp :: [Token] -> [Token] -> (Maybe Token, [Token], [Token], Bool)
 processResp (metadata@(TokColMetaData _ _):xs) errors =

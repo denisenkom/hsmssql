@@ -286,7 +286,8 @@ test_types = do
 
 test_describeResult = do
     let tests = [("float", (SqlDoubleT, Nothing, Nothing, Nothing)),
-                 ("real", (SqlFloatT, Nothing, Nothing, Nothing))]
+                 ("real", (SqlFloatT, Nothing, Nothing, Nothing)),
+                 ("numeric(10,4)", (SqlDecimalT, Just 10, Nothing, Just 4))]
         query = "select " ++ (join "," [("cast(null as " ++ sqltype ++ ")") | (sqltype, _) <- tests])
         values = [("", SqlColDesc typ size octlen dec (Just True)) | (_, (typ, size, octlen, dec)) <- tests]
     conn <- connect
