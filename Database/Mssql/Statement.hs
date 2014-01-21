@@ -35,8 +35,13 @@ newSth conn bufSize query =
                             metadatatok = metadatatok,
                             bufSize = bufSize}
            retval = Statement {executeRaw = fexecuteRaw sstate,
+                               execute = fexecute sstate,
+                               executeMany = fexecuteMany sstate,
                                getColumnNames = fgetColumnNames sstate,
-                               fetchRow = ffetchRow sstate}
+                               fetchRow = ffetchRow sstate,
+                               originalQuery = foriginalQuery sstate,
+                               describeResult = fdescribeResult sstate,
+                               finish = ffinish sstate}
        return retval
 
 processResp :: [Token] -> [Token] -> (Maybe Token, [Token], [Token], Bool)
@@ -152,3 +157,18 @@ ffetchRow sstate =
                 swapMVar (metadatatok sstate) (TokColMetaData cols remrows)
                 return $ (Just . decodeRow) row
             otherwise -> return Nothing
+
+fexecute :: SState -> [SqlValue] -> IO Integer
+fexecute sstate params = return 0
+
+fexecuteMany :: SState -> [[SqlValue]] -> IO ()
+fexecuteMany sstate params = return ()
+
+foriginalQuery :: SState -> String
+foriginalQuery sstate = squery sstate
+
+fdescribeResult :: SState -> IO [(String, SqlColDesc)]
+fdescribeResult sstate = return []
+
+ffinish :: SState -> IO ()
+ffinish sstate = return ()
