@@ -35,6 +35,7 @@ test-suite mssql-tests
     build-depends:
         base,
         HTF == 0.11.*,
+        testpack,
         bytestring == 0.10.*,
         split,
         utf8-string == 0.3.*,

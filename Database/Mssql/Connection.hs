@@ -3,11 +3,13 @@ import qualified Database.Mssql.ConnectionImpl as Impl
 import Database.Mssql.Statement
 import Database.Mssql.Tds
 
+import Data.Bits
 import Data.String.Utils as SU
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Encoding as E
 import Data.Encoding.ASCII
 import qualified Data.Map as Map
+import Database.HDBC
 import qualified Network as Net
 import qualified Network.Socket as Sock
 import System.IO
@@ -57,5 +59,23 @@ fdisconnect = hClose
 frunRaw :: Handle -> Int -> String -> IO ()
 frunRaw s bufSize query = do
     tokens <- exec s query bufSize
-    print tokens
-    fail "errors"
+    let processResp ((TokError num state cls message srvname procname lineno):xs) messages =
+            processResp xs ((num, state, cls, message, srvname, procname, lineno):messages)
+        processResp ((TokInfo num state cls message srvname procname lineno):xs) messages =
+            processResp xs ((num, state, cls, message, srvname, procname, lineno):messages)
+        processResp ((TokDone status _ _):xs) messages =
+            if (status .&. doneMoreResults == 0)
+                then if xs == []
+                    then (messages, status .&. (doneErrorFlag .|. doneSrvErrorFlag) == 0)
+                    else error "unexpected tokens after final DONE token"
+                else processResp xs messages
+        processResp (_:xs) messages = processResp xs messages
+
+    let (messages, ok) = processResp tokens []
+    if ok
+        then return ()
+        else do
+            throwSqlError (if messages == []
+                then SqlError {seState = "", seNativeError = -1, seErrorMsg = "Query failed, server didn't send an error"}
+                else let (errno, _, _, msg, _, _, _) = head messages
+                     in SqlError {seState = "", seNativeError = errno, seErrorMsg = msg})

@@ -33,19 +33,26 @@ foreign import ccall unsafe "htons" htons :: Word16 -> Word16
 
 data MacAddress = MacAddress Word8 Word8 Word8 Word8 Word8 Word8
 
-data Token = TokError {number :: Word32,
+data Token = TokError {number :: Int,
                        state :: Word8,
                        cls :: Word8,
                        message :: String,
                        srvname :: String,
                        procname :: String,
                        lineno :: Word32}
+           | TokInfo {number :: Int,
+                      state :: Word8,
+                      cls :: Word8,
+                      message :: String,
+                      srvname :: String,
+                      procname :: String,
+                      lineno :: Word32}
            | TokLoginAck {iface :: Word8,
                           tdsver :: Word32,
                           progname :: String,
                           progver :: Word32}
            | TokEnvChange [EnvChange]
-           | TokDone Word16 Word16 Word64
+           | TokDone Int Word16 Word64
            | TokZero
            | TokColMetaDataEmpty
            | TokColMetaData [ColMetaData] [Token]
@@ -926,7 +933,7 @@ parseLoginAck = do
     progver <- LG.getWord32be
     return $ TokLoginAck iface tdsver progname progver
 
-parseError = do
+parseMsg f = do
     LG.getWord16le
     number <- LG.getWord32le
     state <- LG.getWord8
@@ -935,7 +942,7 @@ parseError = do
     srvname <- getBVarChar
     procname <- getBVarChar
     lineno <- LG.getWord32le
-    return $ TokError number state cls message srvname procname lineno
+    return $ f (fromIntegral number) state cls message srvname procname lineno
 
 
 parseEnvChange = do
@@ -951,11 +958,15 @@ parseEnvChange = do
     envchgrec <- parseEnvChangeRec
     return $ TokEnvChange [envchgrec]
 
+doneMoreResults = 0x1 :: Int
+doneErrorFlag = 0x2 :: Int
+doneSrvErrorFlag = 0x100 :: Int
+
 parseDone = do
     status <- LG.getWord16le
     curcmd <- LG.getWord16le
     rowcount <- LG.getWord64le
-    return $ TokDone status curcmd rowcount
+    return $ TokDone (fromIntegral status) curcmd rowcount
 
 parseToken :: LG.Get Token
 parseToken = do
@@ -966,7 +977,9 @@ parseToken = do
         129 -> do
             parseColMetaData72
         170 -> do
-            parseError
+            parseMsg TokError
+        171 -> do
+            parseMsg TokInfo
         173 -> do
             parseLoginAck
         227 -> do
@@ -1047,5 +1060,4 @@ exec s query bufSize = do
     sendSqlBatch72 s headers query bufSize
     (resptype, respbuf) <- getPacket s
     let tokens = LG.runGet parseTokens respbuf
-        errors = filter isTokError tokens
     return tokens

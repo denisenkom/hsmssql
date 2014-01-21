@@ -18,6 +18,7 @@ import Data.Time.Calendar
 import Data.Time.LocalTime
 import System.Environment
 import Test.Framework
+import Test.HUnit.Tools
 
 test_parseInstances =
     let s = "\ENQ\179\NULServerName;sqlhost;InstanceName;SQLEXPRESS;" ++
@@ -136,6 +137,13 @@ test_bigRequest = do
     executeRaw stm
     rows <- fetchAllRows stm
     assertEqual [[SqlInt32 (fromIntegral (length val))]] rows
+
+test_error = do
+    conn <- connect
+    let ex = SqlError {seState = "",
+                       seNativeError = 156,
+                       seErrorMsg = "Incorrect syntax near the keyword 'where'."}
+    assertRaises "" ex $ runRaw conn "select where from"
 
 test_types = do
     conn <- connect
