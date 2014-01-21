@@ -44,6 +44,9 @@ newSth conn bufSize query =
                                finish = ffinish sstate}
        return retval
 
+colDescFromTi :: TypeInfo -> SqlColDesc
+colDescFromTi TypeInt4 = SqlColDesc SqlIntegerT Nothing Nothing Nothing (Just False)
+
 processResp :: [Token] -> [Token] -> (Maybe Token, [Token], [Token], Bool)
 processResp (metadata@(TokColMetaData _ _):xs) errors =
     (Just metadata, xs, [], True)
@@ -65,7 +68,7 @@ fexecuteRaw sstate =
                let metadataCols (TokColMetaData cols _) = cols
                    cols = metadataCols metadata
                    coldef (ColMetaData usertype flags ti name) =
-                       (name, SqlColDesc SqlCharT Nothing Nothing Nothing Nothing)
+                       (name, colDescFromTi ti)
                swapMVar (coldefmv sstate) [coldef col | col <- cols]
                swapMVar (tokenstm sstate) remtokens
                swapMVar (metadatatok sstate) metadata
@@ -168,7 +171,7 @@ foriginalQuery :: SState -> String
 foriginalQuery sstate = squery sstate
 
 fdescribeResult :: SState -> IO [(String, SqlColDesc)]
-fdescribeResult sstate = return []
+fdescribeResult sstate = readMVar (coldefmv sstate)
 
 ffinish :: SState -> IO ()
 ffinish sstate = return ()

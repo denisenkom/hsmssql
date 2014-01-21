@@ -127,8 +127,13 @@ test_statement = do
     executeRaw stm
     names <- getColumnNames stm
     assertEqual ["fld1", "fld2"] names
+    descr <- describeResult stm
+    assertEqual [("fld1", SqlColDesc SqlIntegerT Nothing Nothing Nothing (Just False)),
+                 ("fld2", SqlColDesc SqlIntegerT Nothing Nothing Nothing (Just False))]
+                descr
     rows <- fetchAllRows stm
     assertEqual [[SqlInt32 1, SqlInt32 2]] rows
+
 
 test_bigRequest = do
     conn <- connect
