@@ -620,36 +620,9 @@ parseRowCol (ColMetaData _ _ ti _) = do
         TypeNVarChar 0xffff collation -> do getPlp (TdsNVarCharMax collation)
         TypeNVarChar _ collation -> do getShortLenVal $ TdsNVarChar collation
         TypeXml -> do getPlp TdsXml
-        TypeText _ collation -> do
-            size <- LG.getWord8
-            if size == 0
-                then return TdsNull
-                else do
-                    LG.getByteString (fromIntegral size)  -- textptr
-                    LG.getByteString 8  -- timestamp
-                    colSize <- LG.getWord32le
-                    bs <- LG.getLazyByteString (fromIntegral colSize)
-                    return $ TdsText collation bs
-        TypeNText _ collation -> do
-            size <- LG.getWord8
-            if size == 0
-                then return TdsNull
-                else do
-                    LG.getByteString (fromIntegral size)  -- textptr
-                    LG.getByteString 8  -- timestamp
-                    colSize <- LG.getWord32le
-                    bs <- LG.getLazyByteString (fromIntegral colSize)
-                    return $ TdsNText collation bs
-        TypeImage _ -> do
-            size <- LG.getWord8
-            if size == 0
-                then return TdsNull
-                else do
-                    LG.getByteString (fromIntegral size)  -- textptr
-                    LG.getByteString 8  -- timestamp
-                    colSize <- LG.getWord32le
-                    bs <- LG.getLazyByteString (fromIntegral colSize)
-                    return $ TdsImage bs
+        TypeText _ collation -> do getLongLenVal $ TdsText collation
+        TypeNText _ collation -> do getLongLenVal $ TdsNText collation
+        TypeImage _ -> do getLongLenVal TdsImage
         TypeVariant _ -> do
             size <- LG.getWord32le
             if size == 0
@@ -782,6 +755,18 @@ getShortLenVal constr = do
         then return TdsNull
         else do
             bs <- LG.getByteString (fromIntegral size)
+            return $ constr bs
+
+getLongLenVal :: (B.ByteString -> TdsValue) -> LG.Get TdsValue
+getLongLenVal constr = do
+    size <- LG.getWord8
+    if size == 0
+        then return TdsNull
+        else do
+            LG.getByteString (fromIntegral size)  -- textptr
+            LG.getByteString 8  -- timestamp
+            colSize <- LG.getWord32le
+            bs <- LG.getLazyByteString (fromIntegral colSize)
             return $ constr bs
 
 getPlp :: (B.ByteString -> TdsValue) -> LG.Get TdsValue
