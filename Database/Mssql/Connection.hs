@@ -34,14 +34,14 @@ connectMssql host inst username password = do
                                  (preloginInstOpt, instbytes),
                                  (preloginThreadId, B.pack [0, 0, 0, 0]),
                                  (preloginMars, B.pack [0])]
-    sendPreLogin s prelogin bufSize
+    sendPacketLazy bufSize s packPrelogin (serializePreLogin prelogin)
     -- reading prelogin response
     _ <- recvPreLogin s
     -- sending login request
     let login = (verTDS74, (fromIntegral bufSize), 0, 0, 0, 0, 0, 0, 0, 0, 0,
                  "", username, password, "", "", B.empty, "", "", "",
                  (MacAddress 0 0 0 0 0 0), B.empty, "", "")
-    sendLogin s login bufSize
+    sendPacketLazy bufSize s packLogin7 (serializeLogin login)
     -- reading login response
     tokens <- recvTokens s
     -- TODO: get bufSize from response

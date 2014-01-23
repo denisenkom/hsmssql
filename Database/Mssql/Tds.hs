@@ -183,9 +183,9 @@ queryInstances hoststr = do
             print err
             return []
 
-packSQLBatch = 1
-packLogin7 = 16
-packPrelogin = 18
+packSQLBatch = 1 :: Word8
+packLogin7 = 16 :: Word8
+packPrelogin = 18 :: Word8
 
 serializePacket :: Word8 -> B.ByteString -> Int -> Put
 serializePacket packettype packet bufSize = do
@@ -228,12 +228,6 @@ serializePreLogin fields = do
     forM (Map.elems fields) (\v -> do
         putLazyByteString v)
     return ()
-
-
-sendPreLogin :: Handle -> Map.Map Word8 B.ByteString -> Int -> IO ()
-sendPreLogin s prelogin bufSize =
-    do let preloginbuf = runPut $ serializePreLogin prelogin
-       B.hPutStr s $ runPut $ serializePacket packPrelogin preloginbuf bufSize
 
 
 recvPreLogin :: Handle -> IO (Seq.Seq (Word8, Word16, Word16))
@@ -387,15 +381,10 @@ serializeLogin (tdsver, packsize, clientver, pid, connid, optflags1, optflags2,
     putLazyByteString databuf
 
 
-sendLogin :: Handle -> (Word32, Word32, Word32, Word32, Word32,
-                  Word8, Word8, Word8, Word8, Word32,
-                  Word32, String, String, String, String,
-                  String, B.ByteString, String, String, String,
-                  MacAddress, B.ByteString, String,
-                  String) -> Int -> IO ()
-sendLogin s login bufSize =
-    do let loginbuf = runPut $ serializeLogin login
-       B.hPutStr s $ runPut (serializePacket packLogin7 loginbuf bufSize)
+sendPacketLazy :: Int -> Handle -> Word8 -> Put -> IO ()
+sendPacketLazy bufSize s packetType packetGen =
+    do let bs = runPut packetGen
+       B.hPutStr s $ runPut (serializePacket packetType bs bufSize)
 
 
 recvTokens s =
@@ -1058,8 +1047,7 @@ sendSqlBatch72 s headers query bufSize = do
     let putContent = do
             putDataStmHeaders headers
             putLazyByteString $ encodeUcs2 query
-        packetbuf = runPut putContent
-    B.hPutStr s $ runPut $ serializePacket packSQLBatch packetbuf bufSize
+    sendPacketLazy bufSize s packSQLBatch putContent
 
 
 exec :: Handle -> String -> Int -> IO [Token]
