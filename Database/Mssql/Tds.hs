@@ -134,8 +134,10 @@ data TdsValue = TdsNull
               | TdsBinary BS.ByteString
               | TdsChar Collation BS.ByteString
               | TdsVarChar Collation BS.ByteString
+              | TdsVarCharMax Collation B.ByteString
               | TdsNChar Collation BS.ByteString
               | TdsNVarChar Collation BS.ByteString
+              | TdsNVarCharMax Collation B.ByteString
               | TdsXml B.ByteString
               | TdsText Collation B.ByteString
               | TdsNText Collation B.ByteString
@@ -617,6 +619,7 @@ parseRowCol (ColMetaData _ _ ti _) = do
                 else do
                     bs <- LG.getByteString (fromIntegral size)
                     return $ TdsChar collation bs
+        TypeVarChar 0xffff collation -> do getPlp (TdsVarCharMax collation)
         TypeVarChar _ collation -> do
             size <- LG.getWord16le
             if size == 0xffff
@@ -631,6 +634,7 @@ parseRowCol (ColMetaData _ _ ti _) = do
                 else do
                     bs <- LG.getByteString (fromIntegral size)
                     return $ TdsNChar collation bs
+        TypeNVarChar 0xffff collation -> do getPlp (TdsNVarCharMax collation)
         TypeNVarChar _ collation -> do
             size <- LG.getWord16le
             if size == 0xffff
@@ -638,13 +642,7 @@ parseRowCol (ColMetaData _ _ ti _) = do
                 else do
                     bs <- LG.getByteString (fromIntegral size)
                     return $ TdsNVarChar collation bs
-        TypeXml -> do
-            size <- LG.getWord64le
-            case size of
-                0xffffffffffffffff -> return TdsNull
-                otherwise -> do
-                    bs <- getPlp
-                    return $ TdsXml bs
+        TypeXml -> do getPlp TdsXml
         TypeText _ collation -> do
             size <- LG.getWord8
             if size == 0
@@ -801,16 +799,22 @@ getInt4 = do
     return $ TdsInt4 (fromIntegral val)
 
 
-getPlp :: LG.Get B.ByteString
-getPlp = getChunks
-    where getChunks = do
-            chunkSize <- LG.getWord32le
-            if chunkSize == 0
-                then return B.empty
-                else do
-                    chunk <- LG.getLazyByteString (fromIntegral chunkSize)
-                    tailChunks <- getChunks
-                    return $ B.append chunk tailChunks
+getPlp :: (B.ByteString -> TdsValue) -> LG.Get TdsValue
+getPlp constr = do
+    size <- LG.getWord64le
+    case size of
+        0xffffffffffffffff -> return TdsNull
+        otherwise -> do
+            let getChunks = do
+                    chunkSize <- LG.getWord32le
+                    if chunkSize == 0
+                        then return B.empty
+                        else do
+                            chunk <- LG.getLazyByteString (fromIntegral chunkSize)
+                            tailChunks <- getChunks
+                            return $ B.append chunk tailChunks
+            bs <- getChunks
+            return $ constr bs
 
 getDateTimeOffset :: Int -> Int -> LG.Get TdsValue
 getDateTimeOffset scale size = do
