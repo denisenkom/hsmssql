@@ -610,19 +610,19 @@ parseRowCol (ColMetaData _ _ ti _) = do
             case size of
                 0 -> return TdsNull
                 otherwise -> getDateTimeOffset (fromIntegral scale) (fromIntegral size)
-        TypeVarBinary 0xffff -> do getPlp $ TdsVarBinaryMax
-        TypeVarBinary size -> do getShortLenVal $ TdsVarBinary
-        TypeBinary size -> do getShortLenVal $ TdsBinary
-        TypeChar _ collation -> do getShortLenVal $ TdsChar collation
-        TypeVarChar 0xffff collation -> do getPlp (TdsVarCharMax collation)
-        TypeVarChar _ collation -> do getShortLenVal $ TdsVarChar collation
-        TypeNChar _ collation -> do getShortLenVal $ TdsNChar collation
-        TypeNVarChar 0xffff collation -> do getPlp (TdsNVarCharMax collation)
-        TypeNVarChar _ collation -> do getShortLenVal $ TdsNVarChar collation
-        TypeXml -> do getPlp TdsXml
-        TypeText _ collation -> do getLongLenVal $ TdsText collation
-        TypeNText _ collation -> do getLongLenVal $ TdsNText collation
-        TypeImage _ -> do getLongLenVal TdsImage
+        TypeVarBinary 0xffff -> getPlp $ TdsVarBinaryMax
+        TypeVarBinary size -> getShortLenVal $ TdsVarBinary
+        TypeBinary size -> getShortLenVal $ TdsBinary
+        TypeChar _ collation -> getShortLenVal $ TdsChar collation
+        TypeVarChar 0xffff collation -> getPlp $ TdsVarCharMax collation
+        TypeVarChar _ collation -> getShortLenVal $ TdsVarChar collation
+        TypeNChar _ collation -> getShortLenVal $ TdsNChar collation
+        TypeNVarChar 0xffff collation -> getPlp $ TdsNVarCharMax collation
+        TypeNVarChar _ collation -> getShortLenVal $ TdsNVarChar collation
+        TypeXml -> getPlp TdsXml
+        TypeText _ collation -> getLongLenVal $ TdsText collation
+        TypeNText _ collation -> getLongLenVal $ TdsNText collation
+        TypeImage _ -> getLongLenVal TdsImage
         TypeVariant _ -> do
             size <- LG.getWord32le
             if size == 0
