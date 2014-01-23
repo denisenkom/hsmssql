@@ -598,50 +598,14 @@ parseRowCol (ColMetaData _ _ ti _) = do
             case size of
                 0 -> return TdsNull
                 otherwise -> getDateTimeOffset (fromIntegral scale) (fromIntegral size)
-        TypeVarBinary size -> do
-            size <- LG.getWord16le
-            if size == 0xffff
-                then return TdsNull
-                else do
-                    bs <- LG.getByteString (fromIntegral size)
-                    return $ TdsVarBinary bs
-        TypeBinary size -> do
-            size <- LG.getWord16le
-            if size == 0xffff
-                then return TdsNull
-                else do
-                    bs <- LG.getByteString (fromIntegral size)
-                    return $ TdsBinary bs
-        TypeChar _ collation -> do
-            size <- LG.getWord16le
-            if size == 0xffff
-                then return TdsNull
-                else do
-                    bs <- LG.getByteString (fromIntegral size)
-                    return $ TdsChar collation bs
+        TypeVarBinary size -> do getShortLenVal $ TdsVarBinary
+        TypeBinary size -> do getShortLenVal $ TdsBinary
+        TypeChar _ collation -> do getShortLenVal $ TdsChar collation
         TypeVarChar 0xffff collation -> do getPlp (TdsVarCharMax collation)
-        TypeVarChar _ collation -> do
-            size <- LG.getWord16le
-            if size == 0xffff
-                then return TdsNull
-                else do
-                    bs <- LG.getByteString (fromIntegral size)
-                    return $ TdsVarChar collation bs
-        TypeNChar _ collation -> do
-            size <- LG.getWord16le
-            if size == 0xffff
-                then return TdsNull
-                else do
-                    bs <- LG.getByteString (fromIntegral size)
-                    return $ TdsNChar collation bs
+        TypeVarChar _ collation -> do getShortLenVal $ TdsVarChar collation
+        TypeNChar _ collation -> do getShortLenVal $ TdsNChar collation
         TypeNVarChar 0xffff collation -> do getPlp (TdsNVarCharMax collation)
-        TypeNVarChar _ collation -> do
-            size <- LG.getWord16le
-            if size == 0xffff
-                then return TdsNull
-                else do
-                    bs <- LG.getByteString (fromIntegral size)
-                    return $ TdsNVarChar collation bs
+        TypeNVarChar _ collation -> do getShortLenVal $ TdsNVarChar collation
         TypeXml -> do getPlp TdsXml
         TypeText _ collation -> do
             size <- LG.getWord8
@@ -798,6 +762,14 @@ getInt4 = do
     val <- LG.getWord32le
     return $ TdsInt4 (fromIntegral val)
 
+getShortLenVal :: (BS.ByteString -> TdsValue) -> LG.Get TdsValue
+getShortLenVal constr = do
+    size <- LG.getWord16le
+    if size == 0xffff
+        then return TdsNull
+        else do
+            bs <- LG.getByteString (fromIntegral size)
+            return $ constr bs
 
 getPlp :: (B.ByteString -> TdsValue) -> LG.Get TdsValue
 getPlp constr = do
