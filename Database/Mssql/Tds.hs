@@ -17,11 +17,11 @@ import Data.Binary.Strict.Get
 import Data.Binary.Put
 import qualified Data.Encoding as E
 import Data.Encoding.UTF16
+import Data.Encoding.UTF8
 import Data.Binary.IEEE754
 --import Data.Text.Encoding
 --import qualified Data.Text as T
 import qualified Data.Map as Map
-import qualified Codec.Binary.UTF8.String as UTF8
 import Data.List.Split(splitOn)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as B
@@ -153,7 +153,7 @@ parseInstancesImpl = do
         then do
             rem <- remaining
             str <- getByteString rem
-            let tokens = splitOn ";" $ (UTF8.decode . BS.unpack) str
+            let tokens = splitOn ";" $ E.decodeStrictByteString UTF8 str
             return tokens
         else return []
 
