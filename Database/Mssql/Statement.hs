@@ -4,6 +4,7 @@ import Database.Mssql.Collation
 
 import Control.Concurrent.MVar
 import Data.Bits
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Encoding as E
 import Data.Encoding.UTF16
@@ -168,6 +169,7 @@ convertVal (TdsDateTimeOffset days secs offset) = res
           res = SqlZonedTime zonedtime
 
 convertVal (TdsVarBinary bs) = SqlByteString bs
+convertVal (TdsVarBinaryMax bs) = SqlByteString (BS.concat . B.toChunks $ bs)
 convertVal (TdsBinary bs) = SqlByteString bs
 convertVal (TdsChar collation bs) = SqlString $ E.decodeStrictByteString (getCharSet collation) bs
 convertVal (TdsVarChar collation bs) = SqlString $ E.decodeStrictByteString (getCharSet collation) bs

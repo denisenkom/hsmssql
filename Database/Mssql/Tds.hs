@@ -131,6 +131,7 @@ data TdsValue = TdsNull
               | TdsDateTime2 Int32 Rational
               | TdsDateTimeOffset Int32 Rational Int16
               | TdsVarBinary BS.ByteString
+              | TdsVarBinaryMax B.ByteString
               | TdsBinary BS.ByteString
               | TdsChar Collation BS.ByteString
               | TdsVarChar Collation BS.ByteString
@@ -598,6 +599,7 @@ parseRowCol (ColMetaData _ _ ti _) = do
             case size of
                 0 -> return TdsNull
                 otherwise -> getDateTimeOffset (fromIntegral scale) (fromIntegral size)
+        TypeVarBinary 0xffff -> do getPlp $ TdsVarBinaryMax
         TypeVarBinary size -> do getShortLenVal $ TdsVarBinary
         TypeBinary size -> do getShortLenVal $ TdsBinary
         TypeChar _ collation -> do getShortLenVal $ TdsChar collation
