@@ -49,6 +49,8 @@ data Token = TokError {number :: Int,
                           progver :: Word32}
            | TokEnvChange [EnvChange]
            | TokDone Int Word16 Word64
+           | TokDoneProc Int Word16 Word64
+           | TokDoneInProc Int Word16 Word64
            | TokZero
            | TokColMetaDataEmpty
            | TokColMetaData [ColMetaData] [Token]
@@ -550,8 +552,8 @@ getTypeInfo = do
         otherwise -> fail ("unknown typeid: " ++ (show typeid))
 
 putTypeInfo :: TypeInfo -> Put
-putTypeInfo TypeIntN size = do
-    putWord8 0x38
+putTypeInfo (TypeIntN size) = do
+    putWord8 0x26
     putWord8 size
 
 getRowCol :: ColMetaData -> LG.Get TdsValue
@@ -957,13 +959,13 @@ doneMoreResults = 0x1 :: Int
 doneErrorFlag = 0x2 :: Int
 doneSrvErrorFlag = 0x100 :: Int
 
-isDoneSuccess (TokDone status _ _) = status .&. (doneErrorFlag .|. doneSrvErrorFlag) == 0
+isSuccess status = status .&. (doneErrorFlag .|. doneSrvErrorFlag) == 0
 
-getDone = do
+getDone constr = do
     status <- LG.getWord16le
     curcmd <- LG.getWord16le
     rowcount <- LG.getWord64le
-    return $ TokDone (fromIntegral status) curcmd rowcount
+    return $ constr (fromIntegral status) curcmd rowcount
 
 getToken :: LG.Get Token
 getToken = do
@@ -982,7 +984,11 @@ getToken = do
         227 -> do
             getEnvChange
         253 -> do
-            getDone
+            getDone TokDone
+        254 -> do
+            getDone TokDoneProc
+        255 -> do
+            getDone TokDoneInProc
         _ -> do
             fail $ "unknown token type " ++ (show tok)
 
@@ -1046,8 +1052,12 @@ putSqlBatch72 headers query = do
     putLazyByteString $ encodeUcs2 query
 
 
-putValue :: TdsValue -> Put
-putValue (TdsInt4 val) = putWord32le $ fromIntegral val
+putValue :: TypeInfo -> TdsValue -> Put
+putValue ti val =
+    case (ti, val) of
+        (TypeIntN _, TdsInt4 val) -> do
+            putWord8 4
+            putWord32le $ fromIntegral val
 
 
 putParam :: Param -> Put
@@ -1055,7 +1065,7 @@ putParam param = do
     putBVarChar $ name param
     putWord8 $ flags param
     putTypeInfo $ typeInfo param
-    putValue $ value param
+    putValue (typeInfo param) (value param)
 
 
 putRpc :: [DataStmHeader] -> Proc -> Word16 -> [Param] -> Put

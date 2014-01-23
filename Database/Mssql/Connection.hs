@@ -66,7 +66,7 @@ frunRaw s bufSize query = do
         processResp (done@(TokDone status _ _):xs) messages =
             if (status .&. doneMoreResults == 0)
                 then if xs == []
-                    then (messages, isDoneSuccess done)
+                    then (messages, isSuccess status)
                     else error "unexpected tokens after final DONE token"
                 else processResp xs messages
         processResp (_:xs) messages = processResp xs messages

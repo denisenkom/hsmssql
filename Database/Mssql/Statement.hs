@@ -104,9 +104,19 @@ processResp (err@(TokError _ _ _ _ _ _ _):xs) errors =
 processResp (done@(TokDone status _ _):xs) errors =
     if status .&. doneMoreResults == 0
          then if xs == []
-             then (Nothing, [], errors, isDoneSuccess done)
+             then (Nothing, [], errors, isSuccess status)
              else error "unexpected tokens after final DONE token"
          else processResp xs []
+processResp (done@(TokDoneProc status _ _):xs) errors =
+    if status .&. doneMoreResults == 0
+         then if xs == []
+             then (Nothing, [], errors, isSuccess status)
+             else error "unexpected tokens after final DONE token"
+         else processResp xs []
+processResp (tok:_) _ =
+    error $ "unexpected token " ++ (show tok)
+processResp [] errors =
+    error $ "unexpected end of tokens"
 
 fexecuteRaw :: SState -> IO ()
 fexecuteRaw sstate =
