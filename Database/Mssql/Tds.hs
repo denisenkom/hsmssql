@@ -392,9 +392,7 @@ sendPacketLazy bufSize s packetType packetGen =
 
 recvTokens s =
     do (loginresptype, loginrespbuf) <- getPacket s
-       let tokens = LG.runGet getTokens loginrespbuf
-           errors = filter isTokError tokens
-       return tokens
+       return $ LG.runGet getTokens loginrespbuf
 
 
 tokenError = 170
