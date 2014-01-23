@@ -30,8 +30,6 @@ import System.IO
 import Data.Maybe
 import Control.Monad
 
-foreign import ccall unsafe "htons" htons :: Word16 -> Word16
-
 data MacAddress = MacAddress Word8 Word8 Word8 Word8 Word8 Word8
 
 data Token = TokError {number :: Int,
@@ -175,7 +173,7 @@ queryInstances :: String -> IO [Map.Map String String]
 queryInstances hoststr = do
     s <- Sock.socket Sock.AF_INET Sock.Datagram 0
     host <- Sock.inet_addr hoststr
-    let addr = Sock.SockAddrInet (Sock.PortNum (htons 1434)) host
+    let addr = Sock.SockAddrInet 1434 host
     sent <- Sock.sendTo s "\x3" addr
     res <- Network.Socket.ByteString.recv s (16 * 1024 - 1)
     let (parse_res, _) = runGet parseInstances res
