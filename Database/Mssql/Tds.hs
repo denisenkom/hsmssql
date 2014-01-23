@@ -230,14 +230,8 @@ putPreLogin fields = do
     return ()
 
 
-recvPreLogin :: Handle -> IO (Seq.Seq (Word8, Word16, Word16))
-recvPreLogin s =
-    do (packettype, preloginresppacket) <- getPacket s
-       return $ LG.runGet getPreLoginHead preloginresppacket
-
-
-getPacket :: Handle -> IO (Word8, B.ByteString)
-getPacket s = do
+recvPacket :: Handle -> IO (Word8, B.ByteString)
+recvPacket s = do
     let decode = do
             packtype <- getWord8
             isfinal <- getWord8
@@ -387,9 +381,10 @@ sendPacketLazy bufSize s packetType packetGen =
        B.hPutStr s $ runPut (putPacket packetType bs bufSize)
 
 
-recvTokens s =
-    do (loginresptype, loginrespbuf) <- getPacket s
-       return $ LG.runGet getTokens loginrespbuf
+recvPacketLazy :: Handle -> (LG.Get a) -> IO a
+recvPacketLazy s getter = do
+    (packetType, bs) <- recvPacket s
+    return $ LG.runGet getter bs
 
 
 tokenError = 170
@@ -1009,20 +1004,15 @@ putDataStmHeaders headers = do
     putLazyByteString headersbuf
 
 
-
-
-sendSqlBatch72 :: Handle -> [DataStmHeader] -> String -> Int -> IO ()
-sendSqlBatch72 s headers query bufSize = do
-    let putContent = do
-            putDataStmHeaders headers
-            putLazyByteString $ encodeUcs2 query
-    sendPacketLazy bufSize s packSQLBatch putContent
+putSqlBatch72 :: [DataStmHeader] -> String -> Put
+putSqlBatch72 headers query = do
+    putDataStmHeaders headers
+    putLazyByteString $ encodeUcs2 query
 
 
 exec :: Handle -> String -> Int -> IO [Token]
 exec s query bufSize = do
     let headers = [DataStmTransDescrHdr 0 1]
-    sendSqlBatch72 s headers query bufSize
-    (resptype, respbuf) <- getPacket s
-    let tokens = LG.runGet getTokens respbuf
+    sendPacketLazy bufSize s packSQLBatch $ putSqlBatch72 headers query
+    tokens <- recvPacketLazy s getTokens
     return tokens
