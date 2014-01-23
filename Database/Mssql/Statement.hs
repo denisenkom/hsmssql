@@ -90,6 +90,12 @@ colDescFromTi (TypeImage _) = SqlColDesc SqlLongVarBinaryT Nothing Nothing Nothi
 colDescFromTi (TypeNText _ _) = SqlColDesc SqlWLongVarCharT Nothing Nothing Nothing (Just True)
 colDescFromTi (TypeVariant size) = SqlColDesc (SqlUnknownT "sql_variant") Nothing (Just (fromIntegral size)) Nothing (Just True)
 
+sqlToTdsParam :: SqlValue -> TdsValue
+sqlToTdsParam (SqlInt32 val) = TdsInt4 val
+
+sqlToTdsTi :: SqlValue -> TypeInfo
+sqlToTdsTi (SqlInt32 _) = TypeIntN 4
+
 processResp :: [Token] -> [Token] -> (Maybe Token, [Token], [Token], Bool)
 processResp (metadata@(TokColMetaData _ _):xs) errors =
     (Just metadata, xs, [], True)
@@ -208,7 +214,33 @@ ffetchRow sstate =
             otherwise -> return Nothing
 
 fexecute :: SState -> [SqlValue] -> IO Integer
-fexecute sstate params = return 0
+fexecute sstate params = do
+    let headers = [DataStmTransDescrHdr 0 1]
+        s = conn sstate
+        tdsparams [] _ = []
+        tdsparams (val:xs) i = (Param {name = ("@p" ++ (show i)),
+                                       value = sqlToTdsParam val,
+                                       typeInfo = sqlToTdsTi val,
+                                       flags = 0}):(tdsparams xs (i + 1))
+    sendPacketLazy (bufSize sstate) s packRPCRequest $ putRpc headers SpExecuteSql 0 (tdsparams params 1)
+    tokens <- recvPacketLazy s getTokens
+    let (mmetadata, remtokens, errors, status) = processResp tokens []
+    case mmetadata of
+        Just metadata -> do
+            let metadataCols (TokColMetaData cols _) = cols
+                cols = metadataCols metadata
+                coldef (ColMetaData usertype flags ti name) =
+                    (name, colDescFromTi ti)
+            swapMVar (coldefmv sstate) [coldef col | col <- cols]
+            swapMVar (tokenstm sstate) remtokens
+            swapMVar (metadatatok sstate) metadata
+            return ()
+        Nothing -> do
+            throwSqlError (if errors == []
+                then SqlError {seState = "", seNativeError = -1, seErrorMsg = "Query failed, server didn't send an error"}
+                else let (TokError errno _ _ msg _ _ _) = head errors
+                    in SqlError {seState = "", seNativeError = errno, seErrorMsg = msg})
+    return 0
 
 fexecuteMany :: SState -> [[SqlValue]] -> IO ()
 fexecuteMany sstate params = return ()

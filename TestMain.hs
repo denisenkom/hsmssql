@@ -134,6 +134,11 @@ test_statement = do
     rows <- fetchAllRows stm
     assertEqual [[SqlInt32 1, SqlInt32 2]] rows
 
+    stm <- prepare conn "select @p1"
+    execute stm [SqlInt32 1]
+    rows <- fetchAllRows stm
+    assertEqual [[SqlInt32 1]] rows
+
 
 test_bigRequest = do
     conn <- connect

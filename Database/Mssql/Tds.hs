@@ -143,6 +143,18 @@ data TdsValue = TdsNull
      deriving(Eq, Show)
 
 
+data Proc = SpExecuteSql
+          | OtherProc String
+     deriving(Eq, Show)
+
+
+data Param = Param {name :: String,
+                    flags :: Word8,
+                    typeInfo :: TypeInfo,
+                    value :: TdsValue}
+
+procToId :: Proc -> Word16
+procToId SpExecuteSql = 10
 
 getInstances :: Get ([Map.Map String String])
 getInstances = do
@@ -184,6 +196,7 @@ queryInstances hoststr = do
             return []
 
 packSQLBatch = 1 :: Word8
+packRPCRequest = 3 :: Word8
 packLogin7 = 16 :: Word8
 packPrelogin = 18 :: Word8
 
@@ -396,11 +409,29 @@ getUsVarChar = do
     buf <- LG.getLazyByteString ((fromIntegral len) * 2)
     return $ E.decodeLazyByteString UTF16LE buf
 
+putUsVarChar :: String -> Put
+putUsVarChar val = do
+    let len = length val
+    if len > 0xffff
+        then fail("Size of US_VARCHAR is out of limits")
+        else do
+            putWord16le $ fromIntegral len
+            putByteString $ E.encodeStrictByteString UTF16LE val
+
 getBVarChar :: LG.Get String
 getBVarChar = do
     len <- LG.getWord8
     buf <- LG.getLazyByteString ((fromIntegral len) * 2)
     return $ E.decodeLazyByteString UTF16LE buf
+
+putBVarChar :: String -> Put
+putBVarChar val = do
+    let len = length val
+    if len > 0xff
+        then fail("Size of B_VARCHAR is out of limits")
+        else do
+            putWord8 $ fromIntegral len
+            putByteString $ E.encodeStrictByteString UTF16LE val
 
 getTypeInfo :: LG.Get TypeInfo
 getTypeInfo = do
@@ -517,6 +548,11 @@ getTypeInfo = do
                 else return ()
             return TypeXml
         otherwise -> fail ("unknown typeid: " ++ (show typeid))
+
+putTypeInfo :: TypeInfo -> Put
+putTypeInfo TypeIntN size = do
+    putWord8 0x38
+    putWord8 size
 
 getRowCol :: ColMetaData -> LG.Get TdsValue
 getRowCol (ColMetaData _ _ ti _) = do
@@ -1008,6 +1044,30 @@ putSqlBatch72 :: [DataStmHeader] -> String -> Put
 putSqlBatch72 headers query = do
     putDataStmHeaders headers
     putLazyByteString $ encodeUcs2 query
+
+
+putValue :: TdsValue -> Put
+putValue (TdsInt4 val) = putWord32le $ fromIntegral val
+
+
+putParam :: Param -> Put
+putParam param = do
+    putBVarChar $ name param
+    putWord8 $ flags param
+    putTypeInfo $ typeInfo param
+    putValue $ value param
+
+
+putRpc :: [DataStmHeader] -> Proc -> Word16 -> [Param] -> Put
+putRpc headers proc flags params = do
+    putDataStmHeaders headers
+    case proc of
+        OtherProc name -> putUsVarChar name
+        otherwize -> do
+            putWord16le 0xffff
+            putWord16le $ procToId proc
+    putWord16le flags
+    forM_ params putParam
 
 
 exec :: Handle -> String -> Int -> IO [Token]
