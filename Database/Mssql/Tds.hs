@@ -145,8 +145,8 @@ data TdsValue = TdsNull
 
 
 
-parseInstancesImpl :: Get ([String])
-parseInstancesImpl = do
+parseInstances :: Get ([Map.Map String String])
+parseInstances = do
     pref <- getWord8
     _ <- getWord16be
     if pref == 5
@@ -154,15 +154,8 @@ parseInstancesImpl = do
             rem <- remaining
             str <- getByteString rem
             let tokens = splitOn ";" $ E.decodeStrictByteString UTF8 str
-            return tokens
+            return $ tokensToDict tokens
         else return []
-
-parseInstances :: BS.ByteString -> Either String [Map.Map String String]
-parseInstances s = 
-    let res = runGet parseInstancesImpl s
-    in case res of
-        (Right tokens, _) -> Right $ tokensToDict tokens
-        (Left err, _) -> Left err
 
 tokensToDict tokens = tokensToDictImpl [] Map.empty tokens
 
@@ -183,7 +176,7 @@ queryInstances hoststr = do
     let addr = Sock.SockAddrInet (Sock.PortNum (htons 1434)) host
     sent <- Sock.sendTo s "\x3" addr
     res <- Network.Socket.ByteString.recv s (16 * 1024 - 1)
-    let parse_res = parseInstances res
+    let (parse_res, _) = runGet parseInstances res
     case parse_res of
         Right instances -> return instances
         Left err -> do

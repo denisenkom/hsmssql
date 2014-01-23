@@ -37,7 +37,7 @@ test_parseInstances =
                         ("ServerName","sqlhost"),
                         ("Version","10.0.1600.22"),
                         ("tcp","49849")]]
-        decoded = parseInstances bs
+        (decoded, _) = runGet parseInstances bs
     in
         assertEqual (Right ref) decoded
 
