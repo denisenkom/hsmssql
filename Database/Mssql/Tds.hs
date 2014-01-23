@@ -5,6 +5,7 @@ import Database.Mssql.Collation
 import Database.HDBC
 import Database.HDBC.Types
 import qualified Network.Socket as Sock
+import Data.Char
 import Data.Bits
 import Data.Sequence((|>))
 import qualified Data.Sequence as Seq
@@ -165,7 +166,8 @@ tokensToDictImpl l m ("":"":[]) = (m:l)
 tokensToDictImpl l m ("":xs) = tokensToDictImpl (m:l) Map.empty xs
 tokensToDictImpl l m (k:v:xs) = tokensToDictImpl l (Map.insert k v m) xs
 
-isInst name m = case Map.lookup "InstanceName" m of Just n -> n == name
+isInst :: String -> Map.Map String String -> Bool
+isInst name m = case Map.lookup "InstanceName" m of Just n -> map toUpper n == map toUpper name
                                                     Nothing -> False
 
 
