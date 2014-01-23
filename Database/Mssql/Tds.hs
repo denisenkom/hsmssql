@@ -531,7 +531,18 @@ parseTypeInfo = do
 parseRowCol :: ColMetaData -> LG.Get TdsValue
 parseRowCol (ColMetaData _ _ ti _) = do
     case ti of
+        TypeNull -> return TdsNull
+        TypeInt1 -> getInt1
+        TypeBit -> getBit
+        TypeInt2 -> getInt2
         TypeInt4 -> getInt4
+        TypeDateTim4 -> getSmallDateTime
+        TypeFlt4 -> getFlt4
+        TypeMoney -> getMoney
+        TypeDateTime -> getDateTime
+        TypeFlt8 -> getFlt8
+        TypeMoney4 -> getSmallMoney
+        TypeInt8 -> getInt8
         TypeGuid _ -> do
             size <- LG.getWord8
             if size == 0
