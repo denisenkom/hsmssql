@@ -41,8 +41,8 @@ test_getInstances =
     in
         assertEqual (Right ref) decoded
 
-test_serializePacket =
-    let buf = runPut $ serializePacket 1 (B.replicate 10 10) 16
+test_putPacket =
+    let buf = runPut $ putPacket 1 (B.replicate 10 10) 16
         ref = B.pack [1, 0, 0, 16, 0, 0, 0, 0, 10, 10, 10, 10, 10, 10, 10, 10,
                       1, 1, 0, 10, 0, 0, 0, 0, 10, 10]
     in
@@ -74,8 +74,8 @@ test_sendLogin =
                  B.empty,
                  "filepath",
                  "")
-        loginbuf = runPut $ serializeLogin login
-        packet = runPut $ serializePacket packLogin7 loginbuf 4096
+        loginbuf = runPut $ putLogin login
+        packet = runPut $ putPacket packLogin7 loginbuf 4096
         ref = [
             16, 1, 0, 222, 0, 0, 0, 0, 198+16, 0, 0, 0, 4, 0, 0, 116, 0, 16, 0, 0, 0, 1,
             6, 1, 100, 0, 0, 0, 0, 0, 0, 0, 224, 0, 0, 8, 16, 255, 255, 255, 4, 2, 0,

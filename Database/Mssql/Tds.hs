@@ -1,4 +1,3 @@
---module Main where
 module Database.Mssql.Tds where
 
 import Database.Mssql.Collation
@@ -20,8 +19,6 @@ import qualified Data.Encoding as E
 import Data.Encoding.UTF16
 import Data.Encoding.UTF8
 import Data.Binary.IEEE754
---import Data.Text.Encoding
---import qualified Data.Text as T
 import qualified Data.Map as Map
 import Data.List.Split(splitOn)
 import qualified Data.ByteString as BS
@@ -190,8 +187,8 @@ packSQLBatch = 1 :: Word8
 packLogin7 = 16 :: Word8
 packPrelogin = 18 :: Word8
 
-serializePacket :: Word8 -> B.ByteString -> Int -> Put
-serializePacket packettype packet bufSize = do
+putPacket :: Word8 -> B.ByteString -> Int -> Put
+putPacket packettype packet bufSize = do
     let (chunk, rem) = B.splitAt (fromIntegral (bufSize - 8)) packet
     putWord8 packettype
     putWord8 (if rem == B.empty then 1 else 0)  -- final packet
@@ -201,7 +198,7 @@ serializePacket packettype packet bufSize = do
     putWord8 0 -- padding
     putLazyByteString chunk
     if rem /= B.empty
-        then serializePacket packettype rem bufSize
+        then putPacket packettype rem bufSize
         else return ()
     flush
 
@@ -220,8 +217,8 @@ preloginMars = 4 :: Word8
 preloginTraceId = 5 :: Word8
 preloginTerminator = 0xff :: Word8
 
-serializePreLogin :: Map.Map Word8  B.ByteString -> Put
-serializePreLogin fields = do
+putPreLogin :: Map.Map Word8  B.ByteString -> Put
+putPreLogin fields = do
     let fieldsWithOffsets = preparePreLoginImpl ((Map.size fields) * 5 + 1) (Map.assocs fields)
     forM fieldsWithOffsets (\(k, v, offset) -> do
         putWord8 k
@@ -290,16 +287,16 @@ manglePassword = (B.map manglePasswordByte) . encodeUcs2
 
 verTDS74 = 0x74000004 :: Word32
 
-serializeLogin :: (Word32, Word32, Word32, Word32, Word32,
-                  Word8, Word8, Word8, Word8, Word32,
-                  Word32, String, String, String, String,
-                  String, B.ByteString, String, String, String,
-                  MacAddress, B.ByteString, String,
-                  String) -> Put
-serializeLogin (tdsver, packsize, clientver, pid, connid, optflags1, optflags2,
-               typeflags, optflags3, clienttz, clientlcid, hostname,
-               username, password, appname, servername, extensionbuf, ctlintname,
-               language, database, clientid, sspibuf, atchdbfile, changepwd) = do
+putLogin :: (Word32, Word32, Word32, Word32, Word32,
+             Word8, Word8, Word8, Word8, Word32,
+             Word32, String, String, String, String,
+             String, B.ByteString, String, String, String,
+             MacAddress, B.ByteString, String,
+             String) -> Put
+putLogin (tdsver, packsize, clientver, pid, connid, optflags1, optflags2,
+          typeflags, optflags3, clienttz, clientlcid, hostname,
+          username, password, appname, servername, extensionbuf, ctlintname,
+          language, database, clientid, sspibuf, atchdbfile, changepwd) = do
 
     let hostnamebuf = encodeUcs2 hostname
         usernamebuf = encodeUcs2 username
@@ -387,7 +384,7 @@ serializeLogin (tdsver, packsize, clientver, pid, connid, optflags1, optflags2,
 sendPacketLazy :: Int -> Handle -> Word8 -> Put -> IO ()
 sendPacketLazy bufSize s packetType packetGen =
     do let bs = runPut packetGen
-       B.hPutStr s $ runPut (serializePacket packetType bs bufSize)
+       B.hPutStr s $ runPut (putPacket packetType bs bufSize)
 
 
 recvTokens s =
