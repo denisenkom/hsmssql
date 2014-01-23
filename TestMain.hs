@@ -20,7 +20,7 @@ import System.Environment
 import Test.Framework
 import Test.HUnit.Tools
 
-test_parseInstances =
+test_getInstances =
     let s = "\ENQ\179\NULServerName;sqlhost;InstanceName;SQLEXPRESS;" ++
             "IsClustered;No;Version;10.0.1600.22;tcp;49849;;" ++
             "ServerName;sqlhost;InstanceName;SQL2012;IsClustered;" ++
@@ -37,7 +37,7 @@ test_parseInstances =
                         ("ServerName","sqlhost"),
                         ("Version","10.0.1600.22"),
                         ("tcp","49849")]]
-        (decoded, _) = runGet parseInstances bs
+        (decoded, _) = runGet getInstances bs
     in
         assertEqual (Right ref) decoded
 

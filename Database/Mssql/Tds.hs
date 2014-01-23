@@ -147,8 +147,8 @@ data TdsValue = TdsNull
 
 
 
-parseInstances :: Get ([Map.Map String String])
-parseInstances = do
+getInstances :: Get ([Map.Map String String])
+getInstances = do
     pref <- getWord8
     _ <- getWord16be
     if pref == 5
@@ -179,7 +179,7 @@ queryInstances hoststr = do
     let addr = Sock.SockAddrInet 1434 host
     sent <- Sock.sendTo s "\x3" addr
     res <- Network.Socket.ByteString.recv s (16 * 1024 - 1)
-    let (parse_res, _) = runGet parseInstances res
+    let (parse_res, _) = runGet getInstances res
     case parse_res of
         Right instances -> return instances
         Left err -> do
@@ -392,7 +392,7 @@ sendPacketLazy bufSize s packetType packetGen =
 
 recvTokens s =
     do (loginresptype, loginrespbuf) <- getPacket s
-       let tokens = LG.runGet parseTokens loginrespbuf
+       let tokens = LG.runGet getTokens loginrespbuf
            errors = filter isTokError tokens
        return tokens
 
@@ -412,8 +412,8 @@ getBVarChar = do
     buf <- LG.getLazyByteString ((fromIntegral len) * 2)
     return $ E.decodeLazyByteString UTF16LE buf
 
-parseTypeInfo :: LG.Get TypeInfo
-parseTypeInfo = do
+getTypeInfo :: LG.Get TypeInfo
+getTypeInfo = do
     typeid <- LG.getWord8
     case typeid of
         0x1f -> return TypeNull
@@ -528,8 +528,8 @@ parseTypeInfo = do
             return TypeXml
         otherwise -> fail ("unknown typeid: " ++ (show typeid))
 
-parseRowCol :: ColMetaData -> LG.Get TdsValue
-parseRowCol (ColMetaData _ _ ti _) = do
+getRowCol :: ColMetaData -> LG.Get TdsValue
+getRowCol (ColMetaData _ _ ti _) = do
     case ti of
         TypeNull -> return TdsNull
         TypeInt1 -> getInt1
@@ -833,68 +833,68 @@ getDecimal prec scale size = do
         res = if sign == 0 then (-rational) else rational
     return $ TdsDecimal prec scale res
 
-parseRowHelper :: [ColMetaData] -> LG.Get [TdsValue]
-parseRowHelper [] = return []
-parseRowHelper (col:xs) = do
-    val <- parseRowCol col
-    vals <- parseRowHelper xs
+getRowHelper :: [ColMetaData] -> LG.Get [TdsValue]
+getRowHelper [] = return []
+getRowHelper (col:xs) = do
+    val <- getRowCol col
+    vals <- getRowHelper xs
     return $ val:vals
 
 
-parseRowM :: [ColMetaData] -> LG.Get (Maybe Token)
-parseRowM cols = do
+getRowM :: [ColMetaData] -> LG.Get (Maybe Token)
+getRowM cols = do
     tok <- LG.getWord8
     case tok of
         209 -> do
-            vals <- parseRowHelper cols
+            vals <- getRowHelper cols
             return $ Just (TokRow vals)
         210 -> do
             nulls <- LG.getByteString (((length cols) + 7) `quot` 8)
-            let parseNbcRow [] _ = return []
-                parseNbcRow (col:xs) idx = do
+            let getNbcRow [] _ = return []
+                getNbcRow (col:xs) idx = do
                     let (byte, bit) = quotRem idx 8
                     val <- (if testBit (BS.index nulls byte) bit
                         then return TdsNull
-                        else parseRowCol col)
-                    vals <- parseNbcRow xs (idx + 1)
+                        else getRowCol col)
+                    vals <- getNbcRow xs (idx + 1)
                     return $ val:vals
-            vals <- parseNbcRow cols 0
+            vals <- getNbcRow cols 0
             return $ Just (TokRow vals)
         otherwise -> return Nothing
 
-parseRows :: [ColMetaData] -> LG.Get [Token]
-parseRows cols = do
-    rowm <- LG.lookAheadM $ parseRowM cols
+getRows :: [ColMetaData] -> LG.Get [Token]
+getRows cols = do
+    rowm <- LG.lookAheadM $ getRowM cols
     case rowm of
         Just row -> do
-            rows <- parseRows cols
+            rows <- getRows cols
             return (row:rows)
         Nothing -> return []
 
-parseColMetaData72 :: LG.Get Token
-parseColMetaData72 = do
-    let parseCol = do
+getColMetaData72 :: LG.Get Token
+getColMetaData72 = do
+    let getCol = do
             usertype <- LG.getWord32le
             flags <- LG.getWord16le
-            ti <- parseTypeInfo
+            ti <- getTypeInfo
             name <- getBVarChar
             return $ ColMetaData usertype flags ti name
-        parseMeta 0xffff = return TokColMetaDataEmpty
-        parseMeta cnt = do
-            cols <- parseCols cnt
-            rows <- parseRows cols
+        getMeta 0xffff = return TokColMetaDataEmpty
+        getMeta cnt = do
+            cols <- getCols cnt
+            rows <- getRows cols
             return $ TokColMetaData cols rows
-        parseCols 0 = return []
-        parseCols cnt = do
-            col <- parseCol
-            cols <- parseCols $ cnt - 1
+        getCols 0 = return []
+        getCols cnt = do
+            col <- getCol
+            cols <- getCols $ cnt - 1
             return (col:cols)
 
     cnt <- LG.getWord16le
-    parseMeta cnt
+    getMeta cnt
 
 
-parseLoginAck = do
+getLoginAck = do
     LG.getWord16le
     iface <- LG.getWord8
     tdsver <- LG.getWord32be
@@ -902,7 +902,7 @@ parseLoginAck = do
     progver <- LG.getWord32be
     return $ TokLoginAck iface tdsver progname progver
 
-parseMsg f = do
+getMsg f = do
     LG.getWord16le
     number <- LG.getWord32le
     state <- LG.getWord8
@@ -914,8 +914,8 @@ parseMsg f = do
     return $ f (fromIntegral number) state cls message srvname procname lineno
 
 
-parseEnvChange = do
-    let parseEnvChangeRec = do
+getEnvChange = do
+    let getEnvChangeRec = do
             envtype <- LG.getWord8
             case envtype of
                 4 -> do
@@ -924,7 +924,7 @@ parseEnvChange = do
                     return $ PacketSize (read curval) (read prevval)
 
     size <- LG.getWord16le
-    envchgrec <- parseEnvChangeRec
+    envchgrec <- getEnvChangeRec
     return $ TokEnvChange [envchgrec]
 
 doneMoreResults = 0x1 :: Int
@@ -933,41 +933,41 @@ doneSrvErrorFlag = 0x100 :: Int
 
 isDoneSuccess (TokDone status _ _) = status .&. (doneErrorFlag .|. doneSrvErrorFlag) == 0
 
-parseDone = do
+getDone = do
     status <- LG.getWord16le
     curcmd <- LG.getWord16le
     rowcount <- LG.getWord64le
     return $ TokDone (fromIntegral status) curcmd rowcount
 
-parseToken :: LG.Get Token
-parseToken = do
+getToken :: LG.Get Token
+getToken = do
     tok <- LG.getWord8
     case tok of
         0 -> do
             return TokZero
         129 -> do
-            parseColMetaData72
+            getColMetaData72
         170 -> do
-            parseMsg TokError
+            getMsg TokError
         171 -> do
-            parseMsg TokInfo
+            getMsg TokInfo
         173 -> do
-            parseLoginAck
+            getLoginAck
         227 -> do
-            parseEnvChange
+            getEnvChange
         253 -> do
-            parseDone
+            getDone
         _ -> do
             fail $ "unknown token type " ++ (show tok)
 
-parseTokens :: LG.Get [Token]
-parseTokens = do
+getTokens :: LG.Get [Token]
+getTokens = do
     empty <- LG.isEmpty
     if empty
         then return []
         else do
-            token <- parseToken
-            tokens <- parseTokens
+            token <- getToken
+            tokens <- getTokens
             return (token:tokens)
 
 
@@ -1029,5 +1029,5 @@ exec s query bufSize = do
     let headers = [DataStmTransDescrHdr 0 1]
     sendSqlBatch72 s headers query bufSize
     (resptype, respbuf) <- getPacket s
-    let tokens = LG.runGet parseTokens respbuf
+    let tokens = LG.runGet getTokens respbuf
     return tokens
