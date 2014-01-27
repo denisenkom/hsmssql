@@ -55,6 +55,7 @@ data Token = TokError {number :: Int,
            | TokColMetaDataEmpty
            | TokColMetaData [ColMetaData] [Token]
            | TokRow [TdsValue]
+           | TokReturnStatus Int
      deriving(Eq, Show)
 
 isTokLoginAck (TokLoginAck _ _ _ _) = True
@@ -552,9 +553,22 @@ getTypeInfo = do
         otherwise -> fail ("unknown typeid: " ++ (show typeid))
 
 putTypeInfo :: TypeInfo -> Put
-putTypeInfo (TypeIntN size) = do
-    putWord8 0x26
-    putWord8 size
+putTypeInfo typ =
+    case typ of
+        (TypeIntN size) -> do
+            putWord8 0x26
+            putWord8 size
+        (TypeNVarChar size collation) -> do
+            putWord8 0xe7
+            putWord16le size
+            putCollation collation
+
+
+getDecl :: TypeInfo -> String
+getDecl ti =
+    case ti of
+        (TypeIntN 4) -> "int"
+        (TypeNVarChar 0xffff _) -> "nvarchar(max)"
 
 getRowCol :: ColMetaData -> LG.Get TdsValue
 getRowCol (ColMetaData _ _ ti _) = do
@@ -814,6 +828,17 @@ getPlp constr = do
             bs <- getChunks
             return $ constr bs
 
+putPlp :: B.ByteString -> Put
+putPlp bs = do
+    let size = B.length bs
+    putWord64le . fromIntegral $ size
+    let chunks = B.toChunks bs
+    forM_ chunks (\s -> do
+        putWord32le . fromIntegral . BS.length $ s
+        putByteString s)
+    putWord32le 0
+
+
 getDateTimeOffset :: Int -> Int -> LG.Get TdsValue
 getDateTimeOffset scale size = do
     secs <- getTimeSecs (fromIntegral scale) ((fromIntegral size) - 5)
@@ -973,6 +998,9 @@ getToken = do
     case tok of
         0 -> do
             return TokZero
+        121 -> do
+            val <- LG.getWord32le
+            return . TokReturnStatus . fromIntegral $ val
         129 -> do
             getColMetaData72
         170 -> do
@@ -1058,6 +1086,8 @@ putValue ti val =
         (TypeIntN _, TdsInt4 val) -> do
             putWord8 4
             putWord32le $ fromIntegral val
+        (TypeNVarChar 0xffff _, TdsNVarCharMax _ bs) -> do
+            putPlp bs
 
 
 putParam :: Param -> Put

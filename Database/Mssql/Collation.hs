@@ -2,6 +2,7 @@
 module Database.Mssql.Collation where
 
 import qualified Data.Binary.Get as LG
+import qualified Data.Binary.Put as LP
 import Data.Bits
 import Data.Encoding hiding(DynEncoding)
 import Data.Encoding.CP437
@@ -30,12 +31,19 @@ instance Eq DynEncoding where
                                              Nothing -> False
                                              Just e2' -> e1==e2'
 
+emptyCollation = Collation 0 0
+
 getCollation :: LG.Get Collation
 getCollation = do
     lcidandflags <- LG.getWord32le
     sortid <- LG.getWord8
     return $ Collation {sortId = fromIntegral sortid,
                         lcidAndFlags = fromIntegral lcidandflags}
+
+putCollation :: Collation -> LP.Put
+putCollation coll = do
+    LP.putWord32le $ fromIntegral $ lcidAndFlags coll
+    LP.putWord8 $ fromIntegral $ sortId coll
 
 charSetFromSortId :: Int -> DynEncoding
 charSetFromSortId sortId =

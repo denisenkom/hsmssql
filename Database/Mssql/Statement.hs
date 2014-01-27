@@ -8,7 +8,9 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Encoding as E
 import Data.Encoding.UTF16
+import Data.List
 import Data.Ratio
+import Data.String.Utils
 import Data.Time.Calendar
 import Data.Time.Clock
 import Data.Time.LocalTime
@@ -227,12 +229,23 @@ fexecute :: SState -> [SqlValue] -> IO Integer
 fexecute sstate params = do
     let headers = [DataStmTransDescrHdr 0 1]
         s = conn sstate
-        tdsparams [] _ = []
-        tdsparams (val:xs) i = (Param {name = ("@p" ++ (show i)),
-                                       value = sqlToTdsParam val,
-                                       typeInfo = sqlToTdsTi val,
-                                       flags = 0}):(tdsparams xs (i + 1))
-    sendPacketLazy (bufSize sstate) s packRPCRequest $ putRpc headers SpExecuteSql 0 (tdsparams params 1)
+        paramConv val i = Param {name = ("@p" ++ (show i)),
+                                 value = sqlToTdsParam val,
+                                 typeInfo = sqlToTdsTi val,
+                                 flags = 0}
+        tdsparams = [paramConv param i | (i, param) <- zip [1..] params]
+        statementparam = Param {name = "",
+                                value = TdsNVarCharMax emptyCollation (encodeUcs2 (squery sstate)),
+                                typeInfo = TypeNVarChar 0xffff emptyCollation,
+                                flags = 0}
+        decl = join "," (map (getDecl . typeInfo) tdsparams)
+        declparam = Param {name = "",
+                           value = TdsNVarCharMax emptyCollation (encodeUcs2 decl),
+                           typeInfo = TypeNVarChar 0xffff emptyCollation,
+                           flags = 0}
+        allparams = [statementparam, declparam] ++ tdsparams
+        putExecuteSql = putRpc headers SpExecuteSql 0 allparams
+    sendPacketLazy (bufSize sstate) s packRPCRequest putExecuteSql
     tokens <- recvPacketLazy s getTokens
     let (mmetadata, remtokens, errors, status) = processResp tokens []
     case mmetadata of
