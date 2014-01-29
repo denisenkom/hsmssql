@@ -7,6 +7,7 @@ import Database.HDBC.Types
 import qualified Network.Socket as Sock
 import Data.Char
 import Data.Bits
+import Data.Decimal
 import Data.Sequence((|>))
 import qualified Data.Sequence as Seq
 import Data.Word

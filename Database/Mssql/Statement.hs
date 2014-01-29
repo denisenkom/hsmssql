@@ -7,6 +7,7 @@ import Control.Concurrent.MVar
 import Data.Bits
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as B
+import Data.Decimal
 import qualified Data.Encoding as E
 import Data.Encoding.UTF16
 import Data.List
@@ -101,6 +102,7 @@ sqlToTdsParam val = case val of
     SqlWord64 val -> TdsDecimal $ fromIntegral val
     SqlString val -> TdsNVarCharMax emptyCollation (encodeUcs2 val)
     SqlByteString val -> TdsVarBinaryMax $ B.fromChunks [val]
+    SqlRational val -> TdsDecimal $ rationalToDec val
 
 sqlToTdsTi :: SqlValue -> TypeInfo
 sqlToTdsTi val = case val of
@@ -110,7 +112,7 @@ sqlToTdsTi val = case val of
     SqlWord64 _ -> TypeDecimalN 38 0
     SqlString _ -> TypeNVarChar 0xffff emptyCollation
     SqlByteString _ -> TypeVarBinary 0xffff
-    SqlRational _ -> TypeDecimalN
+    SqlRational val -> TypeDecimalN 38 (rationalScale val)
 
 processResp :: [Token] -> [Token] -> (Maybe Token, [Token], [Token], Bool)
 processResp (metadata@(TokColMetaData _ _):xs) errors =
