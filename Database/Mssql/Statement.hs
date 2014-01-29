@@ -238,7 +238,8 @@ fexecute sstate params = do
                                 value = TdsNVarCharMax emptyCollation (encodeUcs2 (squery sstate)),
                                 typeInfo = TypeNVarChar 0xffff emptyCollation,
                                 flags = 0}
-        decl = join "," (map (getDecl . typeInfo) tdsparams)
+        paramDecl param = name param ++ " " ++ (getDecl . typeInfo) param
+        decl = join "," (map paramDecl tdsparams)
         declparam = Param {name = "",
                            value = TdsNVarCharMax emptyCollation (encodeUcs2 decl),
                            typeInfo = TypeNVarChar 0xffff emptyCollation,
@@ -247,7 +248,7 @@ fexecute sstate params = do
         putExecuteSql = putRpc headers SpExecuteSql 0 allparams
     sendPacketLazy (bufSize sstate) s packRPCRequest putExecuteSql
     tokens <- recvPacketLazy s getTokens
-    let (mmetadata, remtokens, errors, status) = processResp tokens []
+    let (mmetadata, remtokens, errors, status, procstat) = processExecResp tokens [] 1
     case mmetadata of
         Just metadata -> do
             let metadataCols (TokColMetaData cols _) = cols
@@ -264,6 +265,31 @@ fexecute sstate params = do
                 else let (TokError errno _ _ msg _ _ _) = head errors
                     in SqlError {seState = "", seNativeError = errno, seErrorMsg = msg})
     return 0
+
+processExecResp :: [Token] -> [Token] -> Int -> (Maybe Token, [Token], [Token], Bool, Int)
+processExecResp (metadata@(TokColMetaData _ _):xs) errors _ =
+    (Just metadata, xs, [], True, 0)
+processExecResp (err@(TokError _ _ _ _ _ _ _):xs) errors procstat =
+    processExecResp xs (err:errors) procstat
+processExecResp (done@(TokDone status _ _):xs) errors procstat =
+    if status .&. doneMoreResults == 0
+         then if xs == []
+             then (Nothing, [], errors, isSuccess status, procstat)
+             else error "unexpected tokens after final DONE token"
+         else processExecResp xs [] procstat
+processExecResp (done@(TokDoneProc status _ _):xs) errors procstat =
+    if status .&. doneMoreResults == 0
+         then if xs == []
+             then (Nothing, [], errors, isSuccess status, procstat)
+             else error "unexpected tokens after final DONE token"
+         else processExecResp xs [] procstat
+processExecResp ((TokReturnStatus status):xs) errors _ =
+    processExecResp xs errors status
+
+processExecResp (tok:_) _ _ =
+    error $ "unexpected token " ++ (show tok)
+processExecResp [] errors _ =
+    error $ "unexpected end of tokens"
 
 fexecuteMany :: SState -> [[SqlValue]] -> IO ()
 fexecuteMany sstate params = return ()
