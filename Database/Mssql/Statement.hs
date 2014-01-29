@@ -94,13 +94,17 @@ colDescFromTi (TypeVariant size) = SqlColDesc (SqlUnknownT "sql_variant") Nothin
 
 sqlToTdsParam :: SqlValue -> TdsValue
 sqlToTdsParam val = case val of
-    (SqlInt32 val) -> TdsInt4 val
-    (SqlString val) -> TdsNVarCharMax emptyCollation (encodeUcs2 val)
+    SqlInt32 val -> TdsInt4 val
+    SqlInt64 val -> TdsInt8 val
+    SqlString val -> TdsNVarCharMax emptyCollation (encodeUcs2 val)
+    SqlByteString val -> TdsVarBinaryMax $ B.fromChunks [val]
 
 sqlToTdsTi :: SqlValue -> TypeInfo
 sqlToTdsTi val = case val of
-    (SqlInt32 _) -> TypeIntN 4
-    (SqlString _) -> TypeNVarChar 0xffff emptyCollation
+    SqlInt32 _ -> TypeIntN 4
+    SqlInt64 _ -> TypeIntN 8
+    SqlString _ -> TypeNVarChar 0xffff emptyCollation
+    SqlByteString _ -> TypeVarBinary 0xffff
 
 processResp :: [Token] -> [Token] -> (Maybe Token, [Token], [Token], Bool)
 processResp (metadata@(TokColMetaData _ _):xs) errors =

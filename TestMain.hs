@@ -294,7 +294,10 @@ test_types = do
     assertEqual [values] rows
 
 test_parameterTypes = do
-    let values = [SqlInt32 1, SqlString "hello"]
+    let values = [SqlInt32 1,
+                  SqlInt64 100,
+                  SqlByteString $ BS.pack [1,2,3],
+                  SqlString "hello"]
         sql = "select " ++ join "," ["@p" ++ show n | n <- [1..length values]]
 
     conn <- connect

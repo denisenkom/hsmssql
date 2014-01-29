@@ -555,10 +555,13 @@ getTypeInfo = do
 putTypeInfo :: TypeInfo -> Put
 putTypeInfo typ =
     case typ of
-        (TypeIntN size) -> do
+        TypeIntN size -> do
             putWord8 0x26
             putWord8 size
-        (TypeNVarChar size collation) -> do
+        TypeVarBinary size -> do
+            putWord8 0xa5
+            putWord16le size
+        TypeNVarChar size collation -> do
             putWord8 0xe7
             putWord16le size
             putCollation collation
@@ -567,8 +570,10 @@ putTypeInfo typ =
 getDecl :: TypeInfo -> String
 getDecl ti =
     case ti of
-        (TypeIntN 4) -> "int"
-        (TypeNVarChar 0xffff _) -> "nvarchar(max)"
+        TypeIntN 4 -> "int"
+        TypeIntN 8 -> "bigint"
+        TypeNVarChar 0xffff _ -> "nvarchar(max)"
+        TypeVarBinary 0xffff -> "varbinary(max)"
 
 getRowCol :: ColMetaData -> LG.Get TdsValue
 getRowCol (ColMetaData _ _ ti _) = do
@@ -1086,7 +1091,12 @@ putValue ti val =
         (TypeIntN _, TdsInt4 val) -> do
             putWord8 4
             putWord32le $ fromIntegral val
+        (TypeIntN _, TdsInt8 val) -> do
+            putWord8 8
+            putWord64le $ fromIntegral val
         (TypeNVarChar 0xffff _, TdsNVarCharMax _ bs) -> do
+            putPlp bs
+        (TypeVarBinary 0xffff, TdsVarBinaryMax bs) -> do
             putPlp bs
 
 
