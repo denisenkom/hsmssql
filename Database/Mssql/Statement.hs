@@ -93,10 +93,14 @@ colDescFromTi (TypeNText _ _) = SqlColDesc SqlWLongVarCharT Nothing Nothing Noth
 colDescFromTi (TypeVariant size) = SqlColDesc (SqlUnknownT "sql_variant") Nothing (Just (fromIntegral size)) Nothing (Just True)
 
 sqlToTdsParam :: SqlValue -> TdsValue
-sqlToTdsParam (SqlInt32 val) = TdsInt4 val
+sqlToTdsParam val = case val of
+    (SqlInt32 val) -> TdsInt4 val
+    (SqlString val) -> TdsNVarCharMax emptyCollation (encodeUcs2 val)
 
 sqlToTdsTi :: SqlValue -> TypeInfo
-sqlToTdsTi (SqlInt32 _) = TypeIntN 4
+sqlToTdsTi val = case val of
+    (SqlInt32 _) -> TypeIntN 4
+    (SqlString _) -> TypeNVarChar 0xffff emptyCollation
 
 processResp :: [Token] -> [Token] -> (Maybe Token, [Token], [Token], Bool)
 processResp (metadata@(TokColMetaData _ _):xs) errors =

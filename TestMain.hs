@@ -293,6 +293,16 @@ test_types = do
     rows <- fetchAllRows stm
     assertEqual [values] rows
 
+test_parameterTypes = do
+    let values = [SqlInt32 1, SqlString "hello"]
+        sql = "select " ++ join "," ["@p" ++ show n | n <- [1..length values]]
+
+    conn <- connect
+    stm <- prepare conn sql
+    execute stm values
+    rows <- fetchAllRows stm
+    assertEqual [values] rows
+
 test_describeResult = do
     let tests = [("float", (SqlDoubleT, Nothing, Nothing, Nothing)),
                  ("real", (SqlFloatT, Nothing, Nothing, Nothing)),
