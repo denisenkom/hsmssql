@@ -1,6 +1,7 @@
 module Database.Mssql.Statement where
 import Database.Mssql.Tds
 import Database.Mssql.Collation
+import Database.Mssql.Decimal
 
 import Control.Concurrent.MVar
 import Data.Bits
@@ -96,15 +97,20 @@ sqlToTdsParam :: SqlValue -> TdsValue
 sqlToTdsParam val = case val of
     SqlInt32 val -> TdsInt4 val
     SqlInt64 val -> TdsInt8 val
+    SqlWord32 val -> TdsInt8 $ fromIntegral val
+    SqlWord64 val -> TdsDecimal $ fromIntegral val
     SqlString val -> TdsNVarCharMax emptyCollation (encodeUcs2 val)
     SqlByteString val -> TdsVarBinaryMax $ B.fromChunks [val]
 
 sqlToTdsTi :: SqlValue -> TypeInfo
 sqlToTdsTi val = case val of
     SqlInt32 _ -> TypeIntN 4
+    SqlWord32 _ -> TypeIntN 8
     SqlInt64 _ -> TypeIntN 8
+    SqlWord64 _ -> TypeDecimalN 38 0
     SqlString _ -> TypeNVarChar 0xffff emptyCollation
     SqlByteString _ -> TypeVarBinary 0xffff
+    SqlRational _ -> TypeDecimalN
 
 processResp :: [Token] -> [Token] -> (Maybe Token, [Token], [Token], Bool)
 processResp (metadata@(TokColMetaData _ _):xs) errors =
@@ -158,7 +164,7 @@ convertVal (TdsFloat v) = SqlDouble v
 convertVal (TdsReal v) = SqlDouble (float2Double v)
 convertVal (TdsGuid v) = SqlByteString v
 convertVal (TdsBool v) = SqlBool v
-convertVal (TdsDecimal _ _ v) = SqlRational v
+convertVal (TdsDecimal v) = SqlRational $ toRational v
 convertVal (TdsMoney v) = SqlRational $ (fromIntegral v) % 10000
 convertVal (TdsSmallMoney v) = SqlRational $ (fromIntegral v) % 10000
 convertVal (TdsDateTime days timefrac) = SqlLocalTime time

@@ -1,6 +1,7 @@
 module Database.Mssql.Tds where
 
 import Database.Mssql.Collation
+import Database.Mssql.Decimal
 import Database.HDBC
 import Database.HDBC.Types
 import qualified Network.Socket as Sock
@@ -121,7 +122,7 @@ data TdsValue = TdsNull
               | TdsFloat Double
               | TdsReal Float
               | TdsGuid BS.ByteString
-              | TdsDecimal Word8 Word8 Rational
+              | TdsDecimal Decimal
               | TdsMoney Int64
               | TdsSmallMoney Int32
               | TdsDateTime Int32 Word32
@@ -558,6 +559,11 @@ putTypeInfo typ =
         TypeIntN size -> do
             putWord8 0x26
             putWord8 size
+        TypeDecimalN prec scale -> do
+            putWord8 0x6a
+            putWord8 . fromIntegral . decimalSize $ prec
+            putWord8 prec
+            putWord8 scale
         TypeVarBinary size -> do
             putWord8 0xa5
             putWord16le size
@@ -574,6 +580,7 @@ getDecl ti =
         TypeIntN 8 -> "bigint"
         TypeNVarChar 0xffff _ -> "nvarchar(max)"
         TypeVarBinary 0xffff -> "varbinary(max)"
+        TypeDecimalN prec scale -> "decimal(" ++ show prec ++ "," ++ show scale ++ ")"
 
 getRowCol :: ColMetaData -> LG.Get TdsValue
 getRowCol (ColMetaData _ _ ti _) = do
@@ -618,12 +625,16 @@ getRowCol (ColMetaData _ _ ti _) = do
             size <- LG.getWord8
             case size of
                 0 -> return TdsNull
-                otherwise -> getDecimal prec scale (fromIntegral size)
+                otherwise -> do
+                    dec <- getDecimal prec scale (fromIntegral size)
+                    return $ TdsDecimal dec
         TypeNumericN prec scale -> do
             size <- LG.getWord8
             case size of
                 0 -> return TdsNull
-                otherwise -> getDecimal prec scale (fromIntegral size)
+                otherwise -> do
+                    dec <- getDecimal prec scale (fromIntegral size)
+                    return $ TdsDecimal dec
         TypeMoneyN _ -> do
             size <- LG.getWord8
             case size of
@@ -702,11 +713,13 @@ getRowCol (ColMetaData _ _ ti _) = do
                         0x6a -> do
                             prec <- LG.getWord8
                             scale <- LG.getWord8
-                            getDecimal prec scale dataSize
+                            dec <- getDecimal prec scale dataSize
+                            return $ TdsDecimal dec
                         0x6c -> do
                             prec <- LG.getWord8
                             scale <- LG.getWord8
-                            getDecimal prec scale dataSize
+                            dec <- getDecimal prec scale dataSize
+                            return $ TdsDecimal dec
                         0x7a -> getSmallMoney
                         0x7f -> getInt8
                         0xa5 -> do
@@ -880,16 +893,6 @@ getDateDays = do
     let days = ((fromIntegral b1) + (fromIntegral b2) * 256 +
                 (fromIntegral b3) * 256 * 256)
     return days
-
-decimalFold :: [Word32] -> Integer
-decimalFold = foldr (\v acc -> (fromIntegral v) + (acc `shiftL` 32)) 0
-
-getDecimal prec scale size = do
-    sign <- LG.getWord8
-    ints <- replicateM ((size - 1) `quot` 4) LG.getWord32le
-    let rational = (decimalFold ints) % (10 ^ scale)
-        res = if sign == 0 then (-rational) else rational
-    return $ TdsDecimal prec scale res
 
 getRowHelper :: [ColMetaData] -> LG.Get [TdsValue]
 getRowHelper [] = return []
@@ -1098,7 +1101,9 @@ putValue ti val =
             putPlp bs
         (TypeVarBinary 0xffff, TdsVarBinaryMax bs) -> do
             putPlp bs
-
+        (TypeDecimalN prec scale, TdsDecimal dec) -> do
+            putWord8 $ fromIntegral (decimalSize prec)
+            putDecimal prec scale dec
 
 putParam :: Param -> Put
 putParam param = do
