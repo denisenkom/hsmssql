@@ -559,17 +559,21 @@ getTypeInfo = do
 putTypeInfo :: TypeInfo -> Put
 putTypeInfo typ =
     case typ of
-        TypeBitN size -> do
-            putWord8 0x68
-            putWord8 size
+        TypeFlt8 -> putWord8 0x3e
         TypeIntN size -> do
             putWord8 0x26
+            putWord8 size
+        TypeBitN size -> do
+            putWord8 0x68
             putWord8 size
         TypeDecimalN prec scale -> do
             putWord8 0x6a
             putWord8 . fromIntegral . decimalSize $ prec
             putWord8 prec
             putWord8 scale
+        TypeFltN size -> do
+            putWord8 0x6d
+            putWord8 size
         TypeVarBinary size -> do
             putWord8 0xa5
             putWord16le size
@@ -586,6 +590,10 @@ putTypeInfo typ =
 getDecl :: TypeInfo -> String
 getDecl ti =
     case ti of
+        TypeFlt4 -> "real"
+        TypeFlt8 -> "float"
+        TypeFltN 8 -> "float"
+        TypeFltN 4 -> "real"
         TypeBitN 1 -> "bit"
         TypeIntN 4 -> "int"
         TypeIntN 8 -> "bigint"
@@ -1103,6 +1111,14 @@ putSqlBatch72 headers query = do
 putValue :: TypeInfo -> TdsValue -> Put
 putValue ti val =
     case (ti, val) of
+        (TypeFlt8, TdsFloat val) -> putFloat64le val
+        (TypeFlt4, TdsReal val) -> putFloat32le val
+        (TypeFltN 4, TdsReal val) -> do
+            putWord8 4
+            putFloat32le val
+        (TypeFltN 8, TdsFloat val) -> do
+            putWord8 8
+            putFloat64le val
         (TypeBitN _, TdsBool val) -> do
             putWord8 1
             putWord8 (if val then 1 else 0)

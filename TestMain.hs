@@ -299,6 +299,7 @@ test_parameterTypes = do
                   (SqlInteger 777, SqlRational 777),
                   (SqlChar 'x', SqlString "x"),
                   (SqlBool True, SqlBool True),
+                  (SqlDouble 0.25, SqlDouble 0.25),
                   (SqlByteString $ BS.pack [1,2,3], SqlByteString $ BS.pack [1,2,3]),
                   (SqlString "hello", SqlString "hello"),
                   (SqlWord32 100, SqlInt64 100),
