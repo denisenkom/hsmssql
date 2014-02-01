@@ -107,6 +107,7 @@ sqlToTdsParam val = case val of
     SqlBool val -> TdsBool val
     SqlDouble val -> TdsFloat val
     SqlRational val -> TdsDecimal $ rationalToDec val
+    SqlLocalDate val -> TdsDate $ fromIntegral $ diffDays val (fromGregorian 1 1 1)
     SqlNull -> TdsNull
 
 sqlToTdsTi :: SqlValue -> TypeInfo
@@ -122,6 +123,7 @@ sqlToTdsTi val = case val of
     SqlBool _ -> TypeBitN 1
     SqlDouble _ -> TypeFltN 8
     SqlRational val -> TypeDecimalN 38 (rationalScale val)
+    SqlLocalDate _ -> TypeDateN
     SqlNull -> TypeNVarChar 1 emptyCollation
 
 processResp :: [Token] -> [Token] -> (Maybe Token, [Token], [Token], Bool)

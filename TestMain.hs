@@ -305,6 +305,7 @@ test_parameterTypes = do
                   (SqlBool True, SqlBool True),
                   (SqlDouble 0.25, SqlDouble 0.25),
                   (SqlRational 1000, SqlRational 1000),
+                  (SqlLocalDate $ fromGregorian 2014 1 1, SqlLocalDate $ fromGregorian 2014 1 1),
                   (SqlNull, SqlNull)
                   ]
         sql = "select " ++ join "," ["@p" ++ show n | n <- [1..length values]]

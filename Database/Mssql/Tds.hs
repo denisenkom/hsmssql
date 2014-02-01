@@ -565,6 +565,7 @@ putTypeInfo typ =
         TypeIntN size -> do
             putWord8 0x26
             putWord8 size
+        TypeDateN -> putWord8 0x28
         TypeBitN size -> do
             putWord8 0x68
             putWord8 size
@@ -603,6 +604,7 @@ getDecl ti =
         TypeBitN 1 -> "bit"
         TypeIntN 4 -> "int"
         TypeIntN 8 -> "bigint"
+        TypeDateN -> "date"
         TypeNChar size _ -> "nchar(" ++ show size ++ ")"
         TypeNVarChar 0xffff _ -> "nvarchar(max)"
         TypeNVarChar size _ -> "nvarchar(" ++ show size ++ ")"
@@ -914,12 +916,16 @@ getDate = do
 
 getDateDays :: LG.Get Int32
 getDateDays = do
-    b1 <- LG.getWord8
-    b2 <- LG.getWord8
+    b12 <- LG.getWord16le
     b3 <- LG.getWord8
-    let days = ((fromIntegral b1) + (fromIntegral b2) * 256 +
+    let days = ((fromIntegral b12) +
                 (fromIntegral b3) * 256 * 256)
     return days
+
+putDateDays :: Int32 -> Put
+putDateDays days = do
+    putWord16le $ fromIntegral $ days .&. 0xffff
+    putWord8 $ fromIntegral $ (days .&. 0xff0000) `shiftR` 16
 
 getRowHelper :: [ColMetaData] -> LG.Get [TdsValue]
 getRowHelper [] = return []
@@ -1135,6 +1141,9 @@ putValue ti val =
         (TypeIntN _, TdsInt8 val) -> do
             putWord8 8
             putWord64le $ fromIntegral val
+        (TypeDateN, TdsDate days) -> do
+            putWord8 3
+            putDateDays days
         (TypeNVarChar 0xffff _, TdsNVarCharMax _ bs) -> do
             putPlp bs
         (TypeNVarChar 0xffff _, TdsNull) -> do
