@@ -290,6 +290,8 @@ getPreLoginHead = do
 encodeUcs2 :: String -> B.ByteString
 encodeUcs2 s = E.encodeLazyByteString UTF16LE s
 
+encodeUcs2Strict :: String -> BS.ByteString
+encodeUcs2Strict s = E.encodeStrictByteString UTF16LE s
 
 manglePasswordByte :: Word8 -> Word8
 manglePasswordByte ch = ((ch `shift` (-4)) .&. 0xff .|. (ch `shift` 4)) `xor` 0xA5
@@ -538,7 +540,7 @@ getTypeInfo = do
         0xef -> do
             size <- LG.getWord16le
             col <- getCollation
-            return $ TypeNChar size col
+            return $ TypeNChar (size `quot` 2) col
         0xf0 -> do
             size <- LG.getWord16le
             return $ TypeUdt size
@@ -572,6 +574,10 @@ putTypeInfo typ =
             putWord8 0xe7
             putWord16le size
             putCollation collation
+        TypeNChar size collation -> do
+            putWord8 0xef
+            putWord16le (size * 2)
+            putCollation collation
 
 
 getDecl :: TypeInfo -> String
@@ -579,6 +585,7 @@ getDecl ti =
     case ti of
         TypeIntN 4 -> "int"
         TypeIntN 8 -> "bigint"
+        TypeNChar size _ -> "nchar(" ++ show size ++ ")"
         TypeNVarChar 0xffff _ -> "nvarchar(max)"
         TypeVarBinary 0xffff -> "varbinary(max)"
         TypeDecimalN prec scale -> "decimal(" ++ show prec ++ "," ++ show scale ++ ")"
@@ -1100,6 +1107,9 @@ putValue ti val =
             putWord64le $ fromIntegral val
         (TypeNVarChar 0xffff _, TdsNVarCharMax _ bs) -> do
             putPlp bs
+        (TypeNChar size _, TdsNChar _ bs) -> do
+            putWord16le $ fromIntegral $ BS.length bs
+            putByteString bs
         (TypeVarBinary 0xffff, TdsVarBinaryMax bs) -> do
             putPlp bs
         (TypeDecimalN prec scale, TdsDecimal dec) -> do

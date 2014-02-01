@@ -297,6 +297,7 @@ test_parameterTypes = do
     let values = [(SqlInt32 1, SqlInt32 1),
                   (SqlInt64 100, SqlInt64 100),
                   (SqlInteger 777, SqlRational 777),
+                  (SqlChar 'x', SqlString "x"),
                   (SqlByteString $ BS.pack [1,2,3], SqlByteString $ BS.pack [1,2,3]),
                   (SqlString "hello", SqlString "hello"),
                   (SqlWord32 100, SqlInt64 100),
