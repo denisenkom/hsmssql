@@ -294,19 +294,21 @@ test_types = do
     assertEqual [values] rows
 
 test_parameterTypes = do
-    let values = [SqlInt32 1,
-                  SqlInt64 100,
-                  SqlByteString $ BS.pack [1,2,3],
-                  SqlString "hello",
-                  SqlWord32 100,
-                  SqlRational 1000]
+    let values = [(SqlInt32 1, SqlInt32 1),
+                  (SqlInt64 100, SqlInt64 100),
+                  (SqlInteger 777, SqlRational 777),
+                  (SqlByteString $ BS.pack [1,2,3], SqlByteString $ BS.pack [1,2,3]),
+                  (SqlString "hello", SqlString "hello"),
+                  (SqlWord32 100, SqlInt64 100),
+                  (SqlWord64 100, SqlRational 100),
+                  (SqlRational 1000, SqlRational 1000)]
         sql = "select " ++ join "," ["@p" ++ show n | n <- [1..length values]]
 
     conn <- connect
     stm <- prepare conn sql
-    execute stm values
+    execute stm [v | (v, _) <- values]
     rows <- fetchAllRows stm
-    assertEqual [values] rows
+    assertEqual [[v | (_, v) <- values]] rows
 
 test_describeResult = do
     let tests = [("float", (SqlDoubleT, Nothing, Nothing, Nothing)),
