@@ -107,6 +107,7 @@ sqlToTdsParam val = case val of
     SqlBool val -> TdsBool val
     SqlDouble val -> TdsFloat val
     SqlRational val -> TdsDecimal $ rationalToDec val
+    SqlNull -> TdsNull
 
 sqlToTdsTi :: SqlValue -> TypeInfo
 sqlToTdsTi val = case val of
@@ -121,6 +122,7 @@ sqlToTdsTi val = case val of
     SqlBool _ -> TypeBitN 1
     SqlDouble _ -> TypeFltN 8
     SqlRational val -> TypeDecimalN 38 (rationalScale val)
+    SqlNull -> TypeNVarChar 1 emptyCollation
 
 processResp :: [Token] -> [Token] -> (Maybe Token, [Token], [Token], Bool)
 processResp (metadata@(TokColMetaData _ _):xs) errors =

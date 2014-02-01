@@ -536,7 +536,9 @@ getTypeInfo = do
         0xe7 -> do
             size <- LG.getWord16le
             col <- getCollation
-            return $ TypeNVarChar size col
+            if size == 0xffff
+                then return $ TypeNVarChar 0xffff col
+                else return $ TypeNVarChar (size `quot` 2) col
         0xef -> do
             size <- LG.getWord16le
             col <- getCollation
@@ -577,9 +579,13 @@ putTypeInfo typ =
         TypeVarBinary size -> do
             putWord8 0xa5
             putWord16le size
+        TypeNVarChar 0xffff collation -> do
+            putWord8 0xe7
+            putWord16le 0xffff
+            putCollation collation
         TypeNVarChar size collation -> do
             putWord8 0xe7
-            putWord16le size
+            putWord16le (size * 2)
             putCollation collation
         TypeNChar size collation -> do
             putWord8 0xef
@@ -599,6 +605,7 @@ getDecl ti =
         TypeIntN 8 -> "bigint"
         TypeNChar size _ -> "nchar(" ++ show size ++ ")"
         TypeNVarChar 0xffff _ -> "nvarchar(max)"
+        TypeNVarChar size _ -> "nvarchar(" ++ show size ++ ")"
         TypeVarBinary 0xffff -> "varbinary(max)"
         TypeDecimalN prec scale -> "decimal(" ++ show prec ++ "," ++ show scale ++ ")"
 
@@ -1130,6 +1137,10 @@ putValue ti val =
             putWord64le $ fromIntegral val
         (TypeNVarChar 0xffff _, TdsNVarCharMax _ bs) -> do
             putPlp bs
+        (TypeNVarChar 0xffff _, TdsNull) -> do
+            putWord64le 0xffffffffffffffff
+        (TypeNVarChar _ _, TdsNull) -> do
+            putWord16le 0xffff
         (TypeNChar size _, TdsNChar _ bs) -> do
             putWord16le $ fromIntegral $ BS.length bs
             putByteString bs
