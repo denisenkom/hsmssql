@@ -96,30 +96,30 @@ colDescFromTi (TypeVariant size) = SqlColDesc (SqlUnknownT "sql_variant") Nothin
 
 sqlToTdsParam :: SqlValue -> TdsValue
 sqlToTdsParam val = case val of
+    SqlString val -> TdsNVarCharMax emptyCollation (encodeUcs2 val)
+    SqlByteString val -> TdsVarBinaryMax $ B.fromChunks [val]
+    SqlWord32 val -> TdsInt8 $ fromIntegral val
+    SqlWord64 val -> TdsDecimal $ fromIntegral val
     SqlInt32 val -> TdsInt4 val
     SqlInt64 val -> TdsInt8 val
     SqlInteger val -> TdsDecimal $ fromIntegral val
     SqlChar val -> TdsNChar emptyCollation (encodeUcs2Strict [val])
     SqlBool val -> TdsBool val
     SqlDouble val -> TdsFloat val
-    SqlWord32 val -> TdsInt8 $ fromIntegral val
-    SqlWord64 val -> TdsDecimal $ fromIntegral val
-    SqlString val -> TdsNVarCharMax emptyCollation (encodeUcs2 val)
-    SqlByteString val -> TdsVarBinaryMax $ B.fromChunks [val]
     SqlRational val -> TdsDecimal $ rationalToDec val
 
 sqlToTdsTi :: SqlValue -> TypeInfo
 sqlToTdsTi val = case val of
-    SqlInt32 _ -> TypeIntN 4
+    SqlString _ -> TypeNVarChar 0xffff emptyCollation
+    SqlByteString _ -> TypeVarBinary 0xffff
     SqlWord32 _ -> TypeIntN 8
+    SqlWord64 _ -> TypeDecimalN 38 0
+    SqlInt32 _ -> TypeIntN 4
     SqlInt64 _ -> TypeIntN 8
     SqlInteger _ -> TypeDecimalN 38 0
     SqlChar _ -> TypeNChar 1 emptyCollation
     SqlBool _ -> TypeBitN 1
     SqlDouble _ -> TypeFltN 8
-    SqlWord64 _ -> TypeDecimalN 38 0
-    SqlString _ -> TypeNVarChar 0xffff emptyCollation
-    SqlByteString _ -> TypeVarBinary 0xffff
     SqlRational val -> TypeDecimalN 38 (rationalScale val)
 
 processResp :: [Token] -> [Token] -> (Maybe Token, [Token], [Token], Bool)

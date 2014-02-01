@@ -294,17 +294,18 @@ test_types = do
     assertEqual [values] rows
 
 test_parameterTypes = do
-    let values = [(SqlInt32 1, SqlInt32 1),
+    let values = [(SqlString "hello", SqlString "hello"),
+                  (SqlByteString $ BS.pack [1,2,3], SqlByteString $ BS.pack [1,2,3]),
+                  (SqlWord32 100, SqlInt64 100),
+                  (SqlWord64 100, SqlRational 100),
+                  (SqlInt32 1, SqlInt32 1),
                   (SqlInt64 100, SqlInt64 100),
                   (SqlInteger 777, SqlRational 777),
                   (SqlChar 'x', SqlString "x"),
                   (SqlBool True, SqlBool True),
                   (SqlDouble 0.25, SqlDouble 0.25),
-                  (SqlByteString $ BS.pack [1,2,3], SqlByteString $ BS.pack [1,2,3]),
-                  (SqlString "hello", SqlString "hello"),
-                  (SqlWord32 100, SqlInt64 100),
-                  (SqlWord64 100, SqlRational 100),
-                  (SqlRational 1000, SqlRational 1000)]
+                  (SqlRational 1000, SqlRational 1000)
+                  ]
         sql = "select " ++ join "," ["@p" ++ show n | n <- [1..length values]]
 
     conn <- connect
