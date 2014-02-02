@@ -565,6 +565,9 @@ putTypeInfo typ =
         TypeIntN size -> do
             putWord8 0x26
             putWord8 size
+        TypeTimeN scale -> do
+            putWord8 0x29
+            putWord8 scale
         TypeDateN -> putWord8 0x28
         TypeBitN size -> do
             putWord8 0x68
@@ -605,6 +608,7 @@ getDecl ti =
         TypeIntN 4 -> "int"
         TypeIntN 8 -> "bigint"
         TypeDateN -> "date"
+        TypeTimeN scale -> "time(" ++ show scale ++ ")"
         TypeNChar size _ -> "nchar(" ++ show size ++ ")"
         TypeNVarChar 0xffff _ -> "nvarchar(max)"
         TypeNVarChar size _ -> "nvarchar(" ++ show size ++ ")"
@@ -904,11 +908,33 @@ getTime scale size = do
     secs <- getTimeSecs (fromIntegral scale) (fromIntegral size)
     return $ TdsTime secs
 
+timeSize :: Int -> Int
+timeSize scale = case scale of
+    0 -> 3
+    1 -> 3
+    2 -> 3
+    3 -> 4
+    4 -> 4
+    5 -> 5
+    6 -> 5
+    7 -> 5
+
 getTimeSecs :: Int -> Int -> LG.Get Rational
 getTimeSecs scale size = do
     ints <- replicateM size LG.getWord8
     let time = foldr (\v acc -> (fromIntegral v) + (acc `shiftL` 8)) (0 :: Word64) ints
     return $ (fromIntegral time) % (10 ^ scale)
+
+putTimeSecs :: Int -> Int -> Rational -> Put
+putTimeSecs scale size secs = do
+    let ival = round $ secs * (10 ^ scale)
+        putInt 0 0 = return ()
+        putInt 0 val = fail $ "secs is not fully consumed: " ++ show val
+        putInt i val = do
+            let (q, r) = quotRem val 0x100
+            putWord8 $ fromIntegral r
+            putInt (i - 1) q
+    putInt size ival
 
 getDate = do
     days <- getDateDays
@@ -1144,6 +1170,10 @@ putValue ti val =
         (TypeDateN, TdsDate days) -> do
             putWord8 3
             putDateDays days
+        (TypeTimeN scale, TdsTime secs) -> do
+            let size = timeSize $ fromIntegral scale
+            putWord8 $ fromIntegral size
+            putTimeSecs (fromIntegral scale) size secs
         (TypeNVarChar 0xffff _, TdsNVarCharMax _ bs) -> do
             putPlp bs
         (TypeNVarChar 0xffff _, TdsNull) -> do
