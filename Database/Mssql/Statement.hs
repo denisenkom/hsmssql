@@ -10,6 +10,7 @@ import qualified Data.ByteString.Lazy as B
 import Data.Decimal
 import qualified Data.Encoding as E
 import Data.Encoding.UTF16
+import Data.Int
 import Data.List
 import Data.Ratio
 import Data.String.Utils
@@ -94,6 +95,12 @@ colDescFromTi (TypeImage _) = SqlColDesc SqlLongVarBinaryT Nothing Nothing Nothi
 colDescFromTi (TypeNText _ _) = SqlColDesc SqlWLongVarCharT Nothing Nothing Nothing (Just True)
 colDescFromTi (TypeVariant size) = SqlColDesc (SqlUnknownT "sql_variant") Nothing (Just (fromIntegral size)) Nothing (Just True)
 
+timeOfDayToSec :: TimeOfDay -> Rational
+timeOfDayToSec = toRational . timeOfDayToTime
+
+dateToDays :: Day -> Int32
+dateToDays val = fromIntegral $ diffDays val (fromGregorian 1 1 1)
+
 sqlToTdsParam :: SqlValue -> TdsValue
 sqlToTdsParam val = case val of
     SqlString val -> TdsNVarCharMax emptyCollation (encodeUcs2 val)
@@ -107,8 +114,10 @@ sqlToTdsParam val = case val of
     SqlBool val -> TdsBool val
     SqlDouble val -> TdsFloat val
     SqlRational val -> TdsDecimal $ rationalToDec val
-    SqlLocalDate val -> TdsDate $ fromIntegral $ diffDays val (fromGregorian 1 1 1)
-    SqlLocalTimeOfDay val -> TdsTime $ toRational $ timeOfDayToTime val
+    SqlLocalDate val -> TdsDate $ dateToDays val
+    SqlLocalTimeOfDay val -> TdsTime $ timeOfDayToSec val
+    SqlLocalTime val -> TdsDateTime2 (dateToDays $ localDay val)
+                                     (timeOfDayToSec $ localTimeOfDay val)
     SqlNull -> TdsNull
 
 sqlToTdsTi :: SqlValue -> TypeInfo
@@ -126,6 +135,7 @@ sqlToTdsTi val = case val of
     SqlRational val -> TypeDecimalN 38 (rationalScale val)
     SqlLocalDate _ -> TypeDateN
     SqlLocalTimeOfDay _ -> TypeTimeN 7
+    SqlLocalTime _ -> TypeDateTime2N 7
     SqlNull -> TypeNVarChar 1 emptyCollation
 
 processResp :: [Token] -> [Token] -> (Maybe Token, [Token], [Token], Bool)
