@@ -101,6 +101,14 @@ timeOfDayToSec = toRational . timeOfDayToTime
 dateToDays :: Day -> Int32
 dateToDays val = fromIntegral $ diffDays val (fromGregorian 1 1 1)
 
+zonedTimeToTds :: ZonedTime -> TdsValue
+zonedTimeToTds val = TdsDateTimeOffset days seconds zoneMinutes
+    where utct = zonedTimeToUTC val
+          days = dateToDays $ utctDay utct
+          seconds = toRational $ utctDayTime utct
+          zoneMinutes = fromIntegral $ timeZoneMinutes $ zonedTimeZone val
+
+
 sqlToTdsParam :: SqlValue -> TdsValue
 sqlToTdsParam val = case val of
     SqlString val -> TdsNVarCharMax emptyCollation (encodeUcs2 val)
@@ -118,6 +126,7 @@ sqlToTdsParam val = case val of
     SqlLocalTimeOfDay val -> TdsTime $ timeOfDayToSec val
     SqlLocalTime val -> TdsDateTime2 (dateToDays $ localDay val)
                                      (timeOfDayToSec $ localTimeOfDay val)
+    SqlZonedTime val -> zonedTimeToTds val
     SqlNull -> TdsNull
 
 sqlToTdsTi :: SqlValue -> TypeInfo
@@ -136,6 +145,7 @@ sqlToTdsTi val = case val of
     SqlLocalDate _ -> TypeDateN
     SqlLocalTimeOfDay _ -> TypeTimeN 7
     SqlLocalTime _ -> TypeDateTime2N 7
+    SqlZonedTime _ -> TypeDateTimeOffsetN 7
     SqlNull -> TypeNVarChar 1 emptyCollation
 
 processResp :: [Token] -> [Token] -> (Maybe Token, [Token], [Token], Bool)

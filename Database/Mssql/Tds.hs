@@ -572,6 +572,9 @@ putTypeInfo typ =
         TypeDateTime2N scale -> do
             putWord8 0x2a
             putWord8 scale
+        TypeDateTimeOffsetN scale -> do
+            putWord8 0x2b
+            putWord8 scale
         TypeBitN size -> do
             putWord8 0x68
             putWord8 size
@@ -613,6 +616,7 @@ getDecl ti =
         TypeDateN -> "date"
         TypeTimeN scale -> "time(" ++ show scale ++ ")"
         TypeDateTime2N scale -> "datetime2(" ++ show scale ++ ")"
+        TypeDateTimeOffsetN scale -> "datetimeoffset(" ++ show scale ++ ")"
         TypeNChar size _ -> "nchar(" ++ show size ++ ")"
         TypeNVarChar 0xffff _ -> "nvarchar(max)"
         TypeNVarChar size _ -> "nvarchar(" ++ show size ++ ")"
@@ -1184,6 +1188,13 @@ putValue ti val =
             putWord8 $ fromIntegral size
             putTimeSecs (fromIntegral scale) (size - 3) secs
             putDateDays days
+        (TypeDateTimeOffsetN scale, TdsNull) -> putWord8 0
+        (TypeDateTimeOffsetN scale, TdsDateTimeOffset days secs offset) -> do
+            let size = 5 + (timeSize $ fromIntegral scale)
+            putWord8 $ fromIntegral size
+            putTimeSecs (fromIntegral scale) (size - 5) secs
+            putDateDays days
+            putWord16le $ fromIntegral offset
         (TypeNVarChar 0xffff _, TdsNVarCharMax _ bs) -> do
             putPlp bs
         (TypeNVarChar 0xffff _, TdsNull) -> do

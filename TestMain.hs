@@ -294,6 +294,9 @@ test_types = do
     assertEqual [values] rows
 
 test_parameterTypes = do
+    let zonedTime = ZonedTime (LocalTime (fromGregorian 2010 1 2)
+                                         (TimeOfDay 3 4 5.01))
+                              (minutesToTimeZone $ 5 * 60 + 30)
     let values = [(SqlString "hello", SqlString "hello"),
                   (SqlByteString $ BS.pack [1,2,3], SqlByteString $ BS.pack [1,2,3]),
                   (SqlWord32 100, SqlInt64 100),
@@ -309,6 +312,7 @@ test_parameterTypes = do
                   (SqlLocalTimeOfDay $ TimeOfDay 1 2 3.1234567, SqlLocalTimeOfDay $ TimeOfDay 1 2 3.1234567),
                   (SqlLocalTime $ LocalTime (fromGregorian 2010 1 2) (TimeOfDay 3 4 5.01),
                    SqlLocalTime $ LocalTime (fromGregorian 2010 1 2) (TimeOfDay 3 4 5.01)),
+                  (SqlZonedTime zonedTime, SqlZonedTime zonedTime),
                   (SqlNull, SqlNull)
                   ]
         sql = "select " ++ join "," ["@p" ++ show n | n <- [1..length values]]
