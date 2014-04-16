@@ -55,6 +55,15 @@ connectMssql host inst username password = do
                                          Impl.runRaw = frunRaw s bufSize,
                                          Impl.prepare = newSth s bufSize}
 
+    -- enable implicit transactions
+    frunRaw s bufSize "SET IMPLICIT_TRANSACTIONS ON"
+
+    return Impl.Connection {Impl.disconnect = fdisconnect s,
+                            Impl.commit = fcommit s bufSize,
+                            Impl.rollback = frollback s bufSize,
+                            Impl.runRaw = frunRaw s bufSize,
+                            Impl.prepare = newSth s bufSize}
+
 fdisconnect :: Handle -> IO ()
 fdisconnect = hClose
 
@@ -70,7 +79,29 @@ frollback s bufSize = do
     let headers = [DataStmTransDescrHdr 0 1]
     sendPacketLazy bufSize s packTranMgr $ putRollbackTran headers "" contTranFlag 0 ""
     tokens <- recvPacketLazy s getTokens
-    return ()
+
+    error $ show tokens
+
+    let processResp ((TokError num state cls message srvname procname lineno):xs) messages =
+            processResp xs ((num, state, cls, message, srvname, procname, lineno):messages)
+        processResp ((TokInfo num state cls message srvname procname lineno):xs) messages =
+            processResp xs ((num, state, cls, message, srvname, procname, lineno):messages)
+        processResp (done@(TokDone status _ _):xs) messages =
+            if (status .&. doneMoreResults == 0)
+                then if xs == []
+                    then (messages, isSuccess status)
+                    else error "unexpected tokens after final DONE token"
+                else processResp xs messages
+        processResp (_:xs) messages = processResp xs messages
+
+    let (messages, ok) = processResp tokens []
+    if ok
+        then return ()
+        else do
+            throwSqlError (if messages == []
+                then SqlError {seState = "", seNativeError = -1, seErrorMsg = "Query failed, server didn't send an error"}
+                else let (errno, _, _, msg, _, _, _) = head messages
+                     in SqlError {seState = "", seNativeError = errno, seErrorMsg = msg})
 
 frunRaw :: Handle -> Int -> String -> IO ()
 frunRaw s bufSize query = do

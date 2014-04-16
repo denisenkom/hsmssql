@@ -71,6 +71,9 @@ isTokMetaData TokColMetaDataEmpty = True
 isTokMetaData _ = False
 
 data EnvChange = PacketSize Int Int
+               | EnvBeginTran BS.ByteString
+               | EnvCommitTran BS.ByteString
+               | EnvRollbackTran BS.ByteString
      deriving(Eq, Show)
 
 data TypeInfo = TypeNull
@@ -431,6 +434,12 @@ getBVarChar = do
     len <- LG.getWord8
     buf <- LG.getLazyByteString ((fromIntegral len) * 2)
     return $ E.decodeLazyByteString UTF16LE buf
+
+getBVarByte :: LG.Get BS.ByteString
+getBVarByte = do
+    len <- LG.getWord8
+    buf <- LG.getByteString (fromIntegral len)
+    return buf
 
 putBVarChar :: String -> Put
 putBVarChar val = do
@@ -1051,6 +1060,18 @@ getEnvChange = do
                     curval <- getBVarChar
                     prevval <- getBVarChar
                     return $ PacketSize (read curval) (read prevval)
+                8 -> do
+                    curval <- getBVarByte
+                    LG.getWord8
+                    return $ EnvBeginTran curval
+                9 -> do
+                    LG.getWord8
+                    oldval <- getBVarByte
+                    return $ EnvCommitTran oldval
+                10 -> do
+                    LG.getWord8
+                    oldval <- getBVarByte
+                    return $ EnvRollbackTran oldval
 
     size <- LG.getWord16le
     envchgrec <- getEnvChangeRec

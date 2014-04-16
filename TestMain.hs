@@ -337,7 +337,10 @@ test_describeResult = do
 
 test_tran = do
     conn <- connect
-    executeRaw "create table tbl1(x int)"
-    rollback
+    let query = "create table tbl1(x int)"
+    stm <- prepare conn query
+    executeRaw stm
+    rollback conn
+    assertEqual 1 0
 
 main = htfMain htf_thisModulesTests
