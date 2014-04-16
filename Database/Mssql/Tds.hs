@@ -202,6 +202,7 @@ queryInstances hoststr = do
 
 packSQLBatch = 1 :: Word8
 packRPCRequest = 3 :: Word8
+packTranMgr = 14 :: Word8
 packLogin7 = 16 :: Word8
 packPrelogin = 18 :: Word8
 
@@ -1236,3 +1237,33 @@ exec s query bufSize = do
     sendPacketLazy bufSize s packSQLBatch $ putSqlBatch72 headers query
     tokens <- recvPacketLazy s getTokens
     return tokens
+
+beginXact = 5 :: Word16
+commitXact = 7 :: Word16
+rollbackXact = 8 :: Word16
+
+contTranFlag = 1 :: Word8
+
+putCommitTran :: [DataStmHeader] -> String -> Word8 -> Word8 -> String -> Put
+putCommitTran headers tranName flags isolationLevel newTranName = do
+    putDataStmHeaders headers
+    putWord16le commitXact
+    putBVarChar tranName
+    putWord8 flags
+    if (flags .&. contTranFlag) /= 0
+        then do
+            putWord8 isolationLevel
+            putBVarChar newTranName
+        else return ()
+
+putRollbackTran :: [DataStmHeader] -> String -> Word8 -> Word8 -> String -> Put
+putRollbackTran headers tranName flags isolationLevel newTranName = do
+    putDataStmHeaders headers
+    putWord16le rollbackXact
+    putBVarChar tranName
+    putWord8 flags
+    if (flags .&. contTranFlag) /= 0
+        then do
+            putWord8 isolationLevel
+            putBVarChar newTranName
+        else return ()

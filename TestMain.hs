@@ -335,4 +335,9 @@ test_describeResult = do
     descr <- describeResult stm
     assertEqual values descr
 
+test_tran = do
+    conn <- connect
+    executeRaw "create table tbl1(x int)"
+    rollback
+
 main = htfMain htf_thisModulesTests

@@ -50,11 +50,27 @@ connectMssql host inst username password = do
             then fail (let srverr = SU.join " " [message e | e <- errors]
                        in if srverr == "" then "Login failed." else srverr)
             else return Impl.Connection {Impl.disconnect = fdisconnect s,
+                                         Impl.commit = fcommit s bufSize,
+                                         Impl.rollback = frollback s bufSize,
                                          Impl.runRaw = frunRaw s bufSize,
                                          Impl.prepare = newSth s bufSize}
 
 fdisconnect :: Handle -> IO ()
 fdisconnect = hClose
+
+fcommit :: Handle -> Int -> IO ()
+fcommit s bufSize = do
+    let headers = [DataStmTransDescrHdr 0 1]
+    sendPacketLazy bufSize s packTranMgr $ putCommitTran headers "" contTranFlag 0 ""
+    tokens <- recvPacketLazy s getTokens
+    return ()
+
+frollback :: Handle -> Int -> IO ()
+frollback s bufSize = do
+    let headers = [DataStmTransDescrHdr 0 1]
+    sendPacketLazy bufSize s packTranMgr $ putRollbackTran headers "" contTranFlag 0 ""
+    tokens <- recvPacketLazy s getTokens
+    return ()
 
 frunRaw :: Handle -> Int -> String -> IO ()
 frunRaw s bufSize query = do
