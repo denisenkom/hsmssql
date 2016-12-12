@@ -95,8 +95,8 @@ test_sendLogin =
 connect = do
     hoststr <- getEnv "HOST"
     inst <- fmap (fromMaybe "") (lookupEnv "INSTANCE")
-    password <- getEnv "SQLPASSWORD"
-    username <- getEnv "SQLUSER"
+    password <- fmap (fromMaybe "sa") (lookupEnv "SQLPASSWORD")
+    username <- fmap (fromMaybe "sa") (lookupEnv "SQLUSER")
     connectMssql hoststr inst username password
 
 test_connect = do
@@ -106,8 +106,8 @@ test_connect = do
 test_badPwd = do
     hoststr <- getEnv "HOST"
     inst <- fmap (fromMaybe "") (lookupEnv "INSTANCE")
-    password <- getEnv "SQLPASSWORD"
-    username <- getEnv "SQLUSER"
+    password <- fmap (fromMaybe "sa") (lookupEnv "SQLPASSWORD")
+    username <- fmap (fromMaybe "sa") (lookupEnv "SQLUSER")
     let handler :: SomeException -> IO ()
         handler e = return ()
         doConnect = connectMssql hoststr inst (username ++ "bad") (password ++ "bad")
